@@ -1,0 +1,478 @@
+{
+  "project": "K Engine",
+  "version": "2.0",
+  "note": "Statuses: pending | partial | blocked | done. Updated from actual results; verification_commands list only commands that exist and were run.",
+  "milestones": [
+    {
+      "id": "M0",
+      "title": "Repository audit and architecture decisions",
+      "tasks": [
+        {
+          "id": "M0-T01",
+          "title": "Audit repository and development environment",
+          "status": "done",
+          "priority": "P0",
+          "depends_on": [],
+          "scope": [
+            "repository",
+            "toolchain"
+          ],
+          "acceptance_criteria": [
+            "Identify new vs existing project",
+            "Inventory relevant source, build files and current tests",
+            "Record OS, compiler, CMake, Ninja, Qt, Python, Rust and graphics availability where discoverable",
+            "Preserve all existing working files"
+          ],
+          "verification_plan": [
+            "Attach environment report and repository inventory to DEVELOPMENT_STATUS.md"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "Rewriting existing architecture"
+          ],
+          "evidence": [
+            "DEVELOPMENT_STATUS.md (Environment audit)"
+          ],
+          "notes": "New project (no pre-existing repo). Toolchain gaps recorded: no cmake/ninja/Qt/Rust/GPU/network."
+        },
+        {
+          "id": "M0-T02",
+          "title": "Create dependency and license inventory",
+          "status": "partial",
+          "priority": "P0",
+          "depends_on": [
+            "M0-T01"
+          ],
+          "scope": [
+            "DEPENDENCIES.md"
+          ],
+          "acceptance_criteria": [
+            "List current and proposed dependencies separately",
+            "Record verified version, purpose, license, integration and required/optional status",
+            "Flag unknown license or deployment obligations instead of guessing"
+          ],
+          "verification_plan": [
+            "Review inventory against actual build manifests and upstream license files"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "Adding all proposed dependencies"
+          ],
+          "evidence": [
+            "DEPENDENCIES.md"
+          ],
+          "notes": "Inventory written; licenses of proposed deps are UNVERIFIED (offline). Verify against upstream license files when network/dependencies are available."
+        },
+        {
+          "id": "M0-T03",
+          "title": "Draft blocking architecture decision records",
+          "status": "done",
+          "priority": "P0",
+          "depends_on": [
+            "M0-T01",
+            "M0-T02"
+          ],
+          "scope": [
+            "Documentation/ADR",
+            "ARCHITECTURE.md"
+          ],
+          "acceptance_criteria": [
+            "ADR covers ECS choice and authoring/runtime bridge",
+            "ADR covers reflection metadata/code generation",
+            "ADR covers persistent UUID and generational runtime handle",
+            "ADR covers initial renderer and Qt integration",
+            "ADR covers project/scene/asset schema and migration",
+            "ADR covers versioned C ABI and Python binding strategy",
+            "Trade-offs and unresolved questions are explicit"
+          ],
+          "verification_plan": [
+            "Review each ADR for context, alternatives, decision, consequences and validation plan"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "Implementing every candidate technology"
+          ],
+          "evidence": [
+            "Documentation/ADR/0001-0009"
+          ],
+          "notes": "ADRs drafted. Statuses: 0001/0003/0006(scene v1)/0008/0009 accepted; 0002/0004/0005/0007 proposed."
+        },
+        {
+          "id": "M0-T04",
+          "title": "Establish reproducible build skeleton",
+          "status": "partial",
+          "priority": "P0",
+          "depends_on": [
+            "M0-T01",
+            "M0-T03"
+          ],
+          "scope": [
+            "CMakeLists.txt",
+            "CMakePresets.json",
+            "Build/"
+          ],
+          "acceptance_criteria": [
+            "Configure and build the smallest real target on the available environment",
+            "Separate generated output from source files",
+            "Document exact configure/build commands",
+            "Do not include unverified platform targets"
+          ],
+          "verification_plan": [
+            "Run configure and build from a clean build directory"
+          ],
+          "verification_commands": [
+            "make STRICT=1 check",
+            "make BUILD_TYPE=Release check",
+            "make SANITIZE=1 STRICT=1 check"
+          ],
+          "out_of_scope": [
+            "Full Runtime or Editor implementation"
+          ],
+          "evidence": [
+            "Makefile",
+            "CMakeLists.txt",
+            "BUILDING.md"
+          ],
+          "notes": "Make route verified (Debug/Release/ASan+UBSan). CMake written but never executed (no cmake). No unverified platform targets included."
+        },
+        {
+          "id": "M0-T05",
+          "title": "Create minimal project CLI foundation",
+          "status": "done",
+          "priority": "P1",
+          "depends_on": [
+            "M0-T04"
+          ],
+          "scope": [
+            "Tools/CLI",
+            "Tests/CLI"
+          ],
+          "acceptance_criteria": [
+            "Implement only real initial commands such as --version and doctor if feasible",
+            "Return meaningful process exit codes",
+            "Expose environment/build diagnostics",
+            "Document commands that exist"
+          ],
+          "verification_plan": [
+            "Run implemented CLI commands and assert output/exit status"
+          ],
+          "verification_commands": [
+            "make cli-test"
+          ],
+          "out_of_scope": [
+            "Unimplemented build/export or asset cook commands"
+          ],
+          "evidence": [
+            "Tools/CLI/main.cpp",
+            "Tests/CLI/test_cli.py"
+          ],
+          "notes": "Commands implemented: --version, --help, doctor [--json]. Nothing else is advertised."
+        },
+        {
+          "id": "M0-T06",
+          "title": "Add initial CI smoke workflow",
+          "status": "pending",
+          "priority": "P1",
+          "depends_on": [
+            "M0-T04"
+          ],
+          "scope": [
+            ".github/workflows",
+            "Tests/"
+          ],
+          "acceptance_criteria": [
+            "CI configures and builds an available supported target",
+            "CI runs the initial automated tests",
+            "Failure output is retained and visible",
+            "No unsupported OS matrix is claimed"
+          ],
+          "verification_plan": [
+            "Run workflow or equivalent local CI commands"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "Full cross-platform release matrix"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M0.5",
+      "title": "Hello Cube Editor vertical slice",
+      "tasks": [
+        {
+          "id": "M05-T01",
+          "title": "Create Qt application shell and dock layout",
+          "status": "blocked",
+          "priority": "P0",
+          "depends_on": [
+            "M0-T04"
+          ],
+          "scope": [
+            "Editor/Application",
+            "Editor/MainWindow"
+          ],
+          "acceptance_criteria": [
+            "Application launches",
+            "Main window has real dockable Explorer, Properties, Viewport and Console panels",
+            "Layout can resize and restore where implemented",
+            "No panel is a static mock-up"
+          ],
+          "verification_plan": [
+            "Application startup smoke test and Qt GUI test where available"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "Full command palette and theme system"
+          ],
+          "evidence": [],
+          "notes": "Blocked by environment: Qt 6 and cmake not installed, no network. See ADR-0004/0005."
+        },
+        {
+          "id": "M05-T02",
+          "title": "Implement persistent scene data and object identity",
+          "status": "done",
+          "priority": "P0",
+          "depends_on": [
+            "M0-T03",
+            "M0-T04"
+          ],
+          "scope": [
+            "Engine/Identity",
+            "Engine/Scene",
+            "Engine/Serialization",
+            "Tests/Unit"
+          ],
+          "acceptance_criteria": [
+            "Create and destroy object records",
+            "Persistent UUID survives save/load",
+            "Runtime generational handle invalidates on destroy and slot reuse",
+            "Stale handle cannot resolve to another object",
+            "Schema version is validated"
+          ],
+          "verification_plan": [
+            "Unit tests for UUID persistence, handle lifetime and invalid input"
+          ],
+          "verification_commands": [
+            "make STRICT=1 test",
+            "make SANITIZE=1 STRICT=1 test"
+          ],
+          "out_of_scope": [
+            "Python/C++/Rust bindings"
+          ],
+          "evidence": [
+            "Engine/Identity",
+            "Engine/Scene",
+            "Engine/Serialization",
+            "Tests/Unit"
+          ],
+          "notes": "In-memory serialization only; file I/O is M05-T05."
+        },
+        {
+          "id": "M05-T03",
+          "title": "Render basic primitives in the Editor viewport",
+          "status": "blocked",
+          "priority": "P0",
+          "depends_on": [
+            "M0-T03",
+            "M05-T01"
+          ],
+          "scope": [
+            "Engine/Rendering",
+            "Editor/Viewport"
+          ],
+          "acceptance_criteria": [
+            "Viewport initializes the selected backend",
+            "Cube, Sphere and Plane are rendered",
+            "Graphics errors are reported",
+            "Backend/context lifecycle follows documented Qt rules"
+          ],
+          "verification_plan": [
+            "Viewport smoke test and screenshot probe where supported"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "PBR, shadows and multiple graphics backends"
+          ],
+          "evidence": [],
+          "notes": "Blocked by environment (no Qt/GL dev stack/GPU). ADR-0004 spike required first."
+        },
+        {
+          "id": "M05-T04",
+          "title": "Add selection synchronization and transform editing",
+          "status": "pending",
+          "priority": "P0",
+          "depends_on": [
+            "M05-T02",
+            "M05-T03"
+          ],
+          "scope": [
+            "Editor/Explorer",
+            "Editor/Inspector",
+            "Editor/Viewport",
+            "Engine/Scene"
+          ],
+          "acceptance_criteria": [
+            "Selection in viewport updates Explorer and Inspector",
+            "Selection in Explorer updates Inspector and viewport",
+            "Position, rotation and scale edits update the rendered scene",
+            "Invalid selection is handled safely"
+          ],
+          "verification_plan": [
+            "Integration tests for selection and transform propagation"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "Advanced multi-select gizmo behavior"
+          ]
+        },
+        {
+          "id": "M05-T05",
+          "title": "Implement scene save/load",
+          "status": "pending",
+          "priority": "P0",
+          "depends_on": [
+            "M05-T02"
+          ],
+          "scope": [
+            "Engine/Serialization",
+            "Tests/Serialization"
+          ],
+          "acceptance_criteria": [
+            "Save scene to versioned format",
+            "Reload preserves UUIDs, hierarchy and supported properties",
+            "Malformed/missing data produces actionable errors",
+            "Save is recoverable/atomic where practical"
+          ],
+          "verification_plan": [
+            "Round-trip, malformed-input and missing-reference tests"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "Prefab and project migration framework beyond required schema version"
+          ],
+          "notes": "Re-scoped dependency: engine-side file save/load (atomic write, read errors) needs only M05-T02. In-memory serialize/validate already done in M05-T02. Next smallest task."
+        },
+        {
+          "id": "M05-T06",
+          "title": "Implement Command Pattern Undo/Redo for core edits",
+          "status": "pending",
+          "priority": "P0",
+          "depends_on": [
+            "M05-T04"
+          ],
+          "scope": [
+            "Editor/Actions",
+            "Engine/Scene",
+            "Tests/Integration"
+          ],
+          "acceptance_criteria": [
+            "Create/delete/transform operations can be undone/redone",
+            "Undo history does not leave dangling handles",
+            "Continuous transform edits form usable history units"
+          ],
+          "verification_plan": [
+            "Integration tests for create/delete/transform undo-redo"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "Undo for every future asset and graph operation"
+          ]
+        },
+        {
+          "id": "M05-T07",
+          "title": "Implement minimal isolated Play/Stop",
+          "status": "pending",
+          "priority": "P0",
+          "depends_on": [
+            "M05-T05",
+            "M05-T06"
+          ],
+          "scope": [
+            "Engine/Runtime",
+            "Engine/Scene",
+            "Editor/Application",
+            "Tests/Integration"
+          ],
+          "acceptance_criteria": [
+            "Play creates isolated runtime state",
+            "Runtime edits do not mutate authored source scene",
+            "Stop discards runtime state by default",
+            "Repeated Play/Stop does not leak or retain stale object references"
+          ],
+          "verification_plan": [
+            "Integration test creates runtime-only changes and verifies source scene remains unchanged after Stop"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "Gameplay scripts, physics and full standalone runtime"
+          ]
+        },
+        {
+          "id": "M05-T08",
+          "title": "Add CLI scene validation, state dump and visual probe",
+          "status": "pending",
+          "priority": "P1",
+          "depends_on": [
+            "M05-T05",
+            "M05-T07"
+          ],
+          "scope": [
+            "Tools/CLI",
+            "Tests/CLI",
+            "Tests/GUI"
+          ],
+          "acceptance_criteria": [
+            "CLI opens/validates a project or scene without manual GUI interaction where supported",
+            "Dump stable scene tree/state as machine-readable JSON",
+            "Returns nonzero on validation failure",
+            "Screenshot capture is optional and only claimed when a graphics context works",
+            "Command exits automatically and writes structured logs"
+          ],
+          "verification_plan": [
+            "Automated test invokes the command, checks JSON, exit code and optional PNG artifact"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "General-purpose remote IPC server"
+          ]
+        },
+        {
+          "id": "M05-T09",
+          "title": "Pass Hello Cube end-to-end acceptance workflow",
+          "status": "pending",
+          "priority": "P0",
+          "depends_on": [
+            "M05-T01",
+            "M05-T02",
+            "M05-T03",
+            "M05-T04",
+            "M05-T05",
+            "M05-T06",
+            "M05-T07",
+            "M05-T08"
+          ],
+          "scope": [
+            "Tests/Integration",
+            "Tests/CLI",
+            "Documentation"
+          ],
+          "acceptance_criteria": [
+            "Create project, create and transform Cube, save, close/reopen and verify state",
+            "Undo/Redo works",
+            "Play/Stop preserves authoring scene",
+            "Logs and failure output are inspectable",
+            "Known GUI/headless limitations are documented"
+          ],
+          "verification_plan": [
+            "Run full M0.5 acceptance test on the available environment and retain report/artifacts"
+          ],
+          "verification_commands": [],
+          "out_of_scope": [
+            "Declaring the entire Editor production-ready"
+          ]
+        }
+      ]
+    }
+  ]
+}
