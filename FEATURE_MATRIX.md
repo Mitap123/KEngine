@@ -9,7 +9,8 @@ Statuses: PLANNED, PROTOTYPE, IMPLEMENTED, TESTED, STABLE, BLOCKED. Each status 
 | Authoring Scene model (create/destroy/reparent/transform, in memory) | TESTED | `test_scene.cpp` |
 | Strict JSON parse/write | TESTED | `test_json.cpp`; **not fuzzed**, not tested on large inputs |
 | Scene format v1 serialize/load **in memory** (UUIDs, hierarchy, transforms, schema/version validation) | TESTED | `test_scene_serialization.cpp` |
-| Scene file save/load, atomic save | PLANNED | M05-T05 |
+| Scene file save/load on POSIX (atomic temp+fsync+rename, `.bak`, size cap, error mapping) | TESTED | `test_scene_file.cpp`; Linux/GCC only; write/fsync/backup/rename failures simulated via hook; no power-loss test |
+| Scene file I/O on non-POSIX platforms (fallback code path) | PROTOTYPE | compiled only when not POSIX; never built or run |
 | CLI `k --version`, `--help`, `doctor [--json]` | TESTED | `Tests/CLI/test_cli.py` |
 | Make build (Debug/Release/ASan+UBSan, strict warnings) | TESTED | `make check` variants |
 | CMake build | PROTOTYPE | written, never executed (no cmake available) |

@@ -63,8 +63,8 @@ std::string show(const T& v) {
 
 #define KCHECK_EQ(a, b)                                                                     \
     do {                                                                                    \
-        const auto& ktest_a = (a);                                                          \
-        const auto& ktest_b = (b);                                                          \
+        const auto ktest_a = (a); /* by value: (a)/(b) may be rvalue-derived refs */       \
+        const auto ktest_b = (b);                                                           \
         if (!(ktest_a == ktest_b)) {                                                        \
             ::ktest::fail(__FILE__, __LINE__,                                               \
                           std::string("CHECK_EQ failed: " #a " == " #b "  (") +             \

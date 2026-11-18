@@ -269,6 +269,37 @@
           "notes": "In-memory serialization only; file I/O is M05-T05."
         },
         {
+          "id": "M05-T02b",
+          "title": "Introduce domain-typed handles (ADR-0003 risk)",
+          "status": "pending",
+          "priority": "P0",
+          "depends_on": [
+            "M05-T02"
+          ],
+          "scope": [
+            "Engine/Identity",
+            "Engine/Scene",
+            "Tests/Unit"
+          ],
+          "acceptance_criteria": [
+            "ObjectHandle (authoring) and a distinct type for a future runtime domain cannot be mixed: mixing is a compile error (verified by a compile-fail test or static_assert on non-convertibility)",
+            "SlotMap/Scene API uses the typed handle; existing behaviour and all existing tests keep passing",
+            "Scene serialization still never contains handles",
+            "ADR-0003 'Known risk' section updated with the outcome"
+          ],
+          "verification_plan": [
+            "make STRICT=1 check and make SANITIZE=1 STRICT=1 check",
+            "static_assert tests for non-convertibility"
+          ],
+          "verification_commands": [
+            "make STRICT=1 check"
+          ],
+          "out_of_scope": [
+            "Runtime World/ECS",
+            "C ABI packing (ADR-0007)"
+          ]
+        },
+        {
           "id": "M05-T03",
           "title": "Render basic primitives in the Editor viewport",
           "status": "blocked",
@@ -329,14 +360,14 @@
         {
           "id": "M05-T05",
           "title": "Implement scene save/load",
-          "status": "pending",
+          "status": "done",
           "priority": "P0",
           "depends_on": [
             "M05-T02"
           ],
           "scope": [
             "Engine/Serialization",
-            "Tests/Serialization"
+            "Tests/Unit"
           ],
           "acceptance_criteria": [
             "Save scene to versioned format",
@@ -347,11 +378,18 @@
           "verification_plan": [
             "Round-trip, malformed-input and missing-reference tests"
           ],
-          "verification_commands": [],
+          "verification_commands": [
+            "make STRICT=1 test",
+            "make SANITIZE=1 STRICT=1 test"
+          ],
           "out_of_scope": [
             "Prefab and project migration framework beyond required schema version"
           ],
-          "notes": "Re-scoped dependency: engine-side file save/load (atomic write, read errors) needs only M05-T02. In-memory serialize/validate already done in M05-T02. Next smallest task."
+          "notes": "Engine-side file save/load done and tested on Linux/GCC. Tests live in Tests/Unit (not Tests/Serialization) so the existing glob picks them up. Caveats: failure paths simulated via hook; non-POSIX fallback unverified. Editor-driven save (dirty tracking, Save/Save As UI) remains with the Editor tasks.",
+          "evidence": [
+            "Engine/Serialization/SceneFile.{h,cpp}",
+            "Tests/Unit/test_scene_file.cpp"
+          ]
         },
         {
           "id": "M05-T06",

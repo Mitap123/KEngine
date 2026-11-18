@@ -19,7 +19,7 @@ Source data must be diffable, versioned, recoverable and safe to load from untru
 
 **Project manifest (proposed, M0.5 project task):** JSON as well (`kproject.json`) so one parser serves all authored formats. The reference sketches TOML (`kproject.toml`); TOML is friendlier for hand-editing/comments, so revisit in M4 when manifests gain build profiles and dependencies. Decide before M4, not now.
 
-**Saves (planned, M05-T05):** write to a temporary file in the same directory, flush, then atomically rename; keep the previous file as a backup where the platform supports it. **Migrations (planned):** back up before any in-place migration; produce a migration report; refuse to overwrite when a step fails.
+**Saves (implemented, M05-T05):** write to a temporary file in the same directory, fsync, copy the previous file to `<name>.bak`, then atomically rename over the target; refuses non-regular targets and symlinks. See `Documentation/Formats/scene-v1.md` (File I/O). **Migrations (planned):** back up before any in-place migration; produce a migration report; refuse to overwrite when a step fails.
 
 **Asset identity (planned, M3):** stable asset GUID in a sidecar `.meta`, independent of path; missing references reported, not silently dropped.
 
@@ -27,7 +27,7 @@ Source data must be diffable, versioned, recoverable and safe to load from untru
 Binary scene format (rejected for source: poor diffs); TOML/YAML for scenes (parser surface/ambiguity; YAML rejected); JSON with comments (non-standard).
 
 ## Evidence (verified)
-`test_json.cpp` (strictness, UTF-8, depth, number round-trip) and `test_scene_serialization.cpp` (round trip, all error classes above, stable bytes on re-save, warnings for unknown fields). Not verified: fuzzing, very large files, file I/O, atomic save, any migration.
+`test_json.cpp` (strictness, UTF-8, depth, number round-trip) and `test_scene_serialization.cpp` (round trip, all error classes above, stable bytes on re-save, warnings for unknown fields). `test_scene_file.cpp` (round trip, backup, failure injection at every save stage, truncation at every prefix length, size limit, non-regular/symlink handling, 5,000-object scene). Not verified: fuzzing, real disk-full/power-loss behaviour, non-POSIX platforms, any migration.
 
 ## Trade-offs
 Numbers are doubles, so integers are exact only to 2^53 (fine for transforms/versions; asset hashes must be strings). JSON is verbose for large scenes; binary cooked formats are a build-time (M4) concern, not a source format.
@@ -36,4 +36,4 @@ Numbers are doubles, so integers are exact only to 2^53 (fine for transforms/ver
 Format is versioned; adding fields is additive within a version only if the loader tolerates them (it does, with warnings). Breaking changes require a new `schema_version` and a migration step.
 
 ## Validation plan
-M05-T05: file round trip, malformed/truncated file tests, atomic-save failure injection. Later: parser fuzzing (`Tests/Fuzz`).
+Done for files (M05-T05). Later: parser fuzzing (`Tests/Fuzz`), migration tests when a v2 exists.

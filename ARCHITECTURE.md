@@ -15,7 +15,7 @@ Editor/ (planned, Qt, Editor-only) ─┘
 | Core | `Engine/Core` | `Result<T>`/`Status`/`Error` (stable string `code` + message), version constant |
 | Identity | `Engine/Identity` | `Uuid` (persistent identity), `Handle` + `SlotMap<T>` (generational runtime references). ADR-0003 |
 | Scene | `Engine/Scene` | **Authoring** `Scene`: objects with UUID, name, kind (empty/cube/sphere/plane), Euler transform, ordered hierarchy. Create/destroy (subtree)/reparent (cycle-safe)/rename/set transform. Not thread-safe |
-| Serialization | `Engine/Serialization` | Strict `Json`; `SceneSerializer` (scene ⇄ JSON, format `kengine.scene` v1). In-memory only. ADR-0006 |
+| Serialization | `Engine/Serialization` | Strict `Json`; `SceneSerializer` (scene ⇄ JSON, format `kengine.scene` v1); `SceneFile` (atomic save with backup, bounded load; POSIX-verified). ADR-0006 |
 | CLI | `Tools/CLI` | `k --version`, `k --help`, `k doctor [--json]` (build facts + engine self-checks) |
 
 ## Invariants enforced by code and tests
@@ -26,7 +26,7 @@ Editor/ (planned, Qt, Editor-only) ─┘
 
 ## Planned (not implemented)
 - Runtime `World`/ECS, scheduler, Play isolation, headless stepping (M1; ADR-0001).
-- Qt Editor shell, viewport/renderer, Undo/Redo commands, file save/load, project creation (M0.5; ADR-0004/0005).
+- Qt Editor shell, viewport/renderer, Undo/Redo commands, project creation (M0.5; ADR-0004/0005).
 - Reflection/Inspector metadata (ADR-0002); C ABI, Python/C++/Rust bindings (ADR-0007); assets, build/export, simulation (M3–M6).
 
 ## Known architectural risks

@@ -29,3 +29,6 @@ Record the outcome (date, cmake version, result) here when it is run. Until then
 
 ## Not buildable yet
 The Qt Editor, renderer, Runtime, Python/C++/Rust SDKs do not exist. Qt 6 is not installed in the dev environment (ADR-0004/0005).
+
+## Platform coverage
+Only Linux x86_64 + GCC 13.3 has been built and tested. The scene file code has an untested non-POSIX fallback (no fsync); Windows/macOS/Clang are unverified.

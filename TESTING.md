@@ -5,7 +5,7 @@ Reports must distinguish **passed / failed / skipped / not-run**. The unit runne
 ## Layers that exist
 | Layer | Location | Command | What it covers |
 |---|---|---|---|
-| Unit | `Tests/Unit/*.cpp` (in-repo `KTEST` harness) | `make test` | UUID, handles/SlotMap, Scene, JSON, scene serialization |
+| Unit | `Tests/Unit/*.cpp` (in-repo `KTEST` harness) | `make test` | UUID, handles/SlotMap, Scene, JSON, scene serialization, scene file I/O (temp dirs under the system temp path, removed after each test) |
 | CLI | `Tests/CLI/test_cli.py` (Python `unittest`) | `make cli-test` | `k --version`, `--help`, `doctor` (+`--json`), usage errors, exit codes |
 | Sanitizers | same tests | `make SANITIZE=1 check` | ASan + UBSan on all of the above |
 
@@ -21,3 +21,8 @@ See `DEVELOPMENT_STATUS.md` ("Verification") for exact command output summaries 
 - Prefer failure-path tests; match errors by `code`, not message text.
 - Do not weaken an assertion to make a test pass unless the underlying decision is recorded (example: JSON underflow policy, ADR-0006).
 - Randomized tests use fixed seeds so failures reproduce.
+
+## Notes on file-I/O tests
+- Failure paths of the atomic save are exercised with the test-only `SaveOptions::fault_injection` hook (stages `create_temp`, `write`, `sync`, `backup`, `rename`). They prove cleanup and error mapping, not behaviour on a genuinely failing disk.
+- The suite was developed running as `root`, which ignores file permissions, so "read-only directory" cases are deliberately **not** tested; do not add permission-based tests without handling that.
+- The `KCHECK_EQ` macro copies its operands (a dangling-reference bug with rvalue-derived references was found and fixed during M05-T05).

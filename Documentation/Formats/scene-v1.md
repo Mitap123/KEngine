@@ -1,6 +1,6 @@
 # Scene format `kengine.scene` v1
 
-Status: **implemented and unit-tested in memory** (`Engine/Serialization/SceneSerializer.*`). File I/O and atomic save are not implemented yet (M05-T05). Decisions: ADR-0006.
+Status: **implemented and unit-tested**: in-memory (`SceneSerializer.*`) and file I/O (`SceneFile.*`, Linux/GCC only). Decisions: ADR-0006.
 
 ## Example
 ```json
@@ -51,3 +51,11 @@ Sibling order: children of a parent keep the relative order in which they appear
 
 ## Versioning
 Any incompatible change bumps `schema_version` and adds a migration step (`vN → vN+1`). Additive optional fields do not bump the version but older tools will drop them on re-save.
+
+## File I/O (`Engine/Serialization/SceneFile.h`)
+- **Save** is atomic: serialize in memory → write `.<name>.<8 hex>.tmp` in the *same directory* (`O_EXCL`) → `fsync` → copy any existing file to `<name>.bak` (single generation, `SaveOptions::keep_backup`) → `rename()` over the target → best-effort directory `fsync`. On any failure the temp file is removed and the existing file is untouched. A crash can leave a stray `.tmp` file; it is never loaded.
+- The `.bak` copy is a plain copy, not itself atomic: a crash during the backup step can leave a damaged `.bak` but never a damaged target.
+- Save refuses to overwrite a directory/device (`file.not_regular`) or a symbolic link (`file.symlink_unsupported`). It does not create missing directories.
+- **Load** refuses non-regular files, reads at most 64 MiB by default (`file.too_large`), and prefixes every error with the file path. Loading through a symlink works.
+- File error codes: `file.invalid_path`, `file.not_found`, `file.not_regular`, `file.symlink_unsupported`, `file.too_large`, `file.io_error`, `file.read_failed`, `file.temp_create_failed`, `file.write_failed`, `file.sync_failed`, `file.backup_failed`, `file.rename_failed`.
+- Limits of what is verified: only the POSIX path has been built and run. Write/fsync/backup/rename failures are *simulated* via a test-only hook, not produced by a real failing disk; power-loss durability is not tested.
