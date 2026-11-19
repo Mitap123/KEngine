@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -60,7 +61,7 @@ Scene sample_scene(const char* tag = "A") {
 
 std::vector<std::string> uuids_of(const Scene& s) {
     std::vector<std::string> v;
-    s.visit_preorder([&](Handle, const SceneObject& o) { v.push_back(o.id.to_string() + "|" + o.name); });
+    s.visit_preorder([&](ObjectHandle, const SceneObject& o) { v.push_back(o.id.to_string() + "|" + o.name); });
     return v;
 }
 
@@ -170,15 +171,22 @@ KTEST(scene_file_save_rejects_bad_targets) {
     fs::create_directory(dir / "adir");
     KCHECK_EQ(code_of(save_scene_file(sample_scene(), dir / "adir")), std::string("file.not_regular"));
 
-    // A symlink must not be silently replaced by a regular file.
+    // A symlink must not be silently replaced by a regular file. Creating a
+    // symlink can be impossible (for example on Windows without the privilege);
+    // that part is then reported as skipped rather than failing the suite.
     KCHECK(save_scene_file(sample_scene("REAL"), dir / "real.kscene").ok());
     const std::string real_before = slurp(dir / "real.kscene");
-    fs::create_symlink(dir / "real.kscene", dir / "link.kscene");
-    KCHECK_EQ(code_of(save_scene_file(sample_scene("X"), dir / "link.kscene")), std::string("file.symlink_unsupported"));
-    KCHECK(fs::is_symlink(dir / "link.kscene"));
-    KCHECK_EQ(slurp(dir / "real.kscene"), real_before);
-    // ...but loading through a symlink is fine.
-    KCHECK(load_scene_file(dir / "link.kscene").ok());
+    std::error_code link_ec;
+    fs::create_symlink(dir / "real.kscene", dir / "link.kscene", link_ec);
+    if (link_ec) {
+        std::printf("    note: symlink creation unavailable (%s); symlink checks SKIPPED\n", link_ec.message().c_str());
+    } else {
+        KCHECK_EQ(code_of(save_scene_file(sample_scene("X"), dir / "link.kscene")), std::string("file.symlink_unsupported"));
+        KCHECK(fs::is_symlink(dir / "link.kscene"));
+        KCHECK_EQ(slurp(dir / "real.kscene"), real_before);
+        // ...but loading through a symlink is fine.
+        KCHECK(load_scene_file(dir / "link.kscene").ok());
+    }
 
     for (const std::string& name : dir.listing()) KCHECK(name.find(".tmp") == std::string::npos);
 }
@@ -267,10 +275,10 @@ KTEST(scene_file_load_refuses_devices_instead_of_reading_them) {
 KTEST(scene_file_large_scene_round_trips) {
     TempDir dir;
     Scene s;
-    Handle parent = kNullHandle;
+    ObjectHandle parent = kNullObjectHandle;
     for (int i = 0; i < 5000; ++i) {
         auto h = s.create(i % 3 == 0 ? ObjectKind::Cube : ObjectKind::Sphere, "obj" + std::to_string(i),
-                          i % 10 == 0 ? kNullHandle : parent);
+                          i % 10 == 0 ? kNullObjectHandle : parent);
         parent = h.value();
     }
     KCHECK(save_scene_file(s, dir / "big.kscene").ok());

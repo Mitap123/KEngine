@@ -2,9 +2,10 @@
 #
 # STATUS: WRITTEN BUT NEVER EXECUTED. The development environment that
 # produced this file has no cmake binary (see DEVELOPMENT_STATUS.md), so this
-# file has not been configured, built or tested by anyone. Treat the first
-# real `cmake` run as the verification step and record the result in
-# BUILDING.md. The verified build route is the Makefile.
+# file has not been configured, built or tested by the author. Treat the first
+# real `cmake` run (on the project owner's Windows machine) as the verification
+# step and record the result in BUILDING.md. The verified build route on Linux
+# is the Makefile. MSVC/MinGW support is expected but UNVERIFIED.
 #
 # Sources are collected by the same globs as the Makefile so the two cannot
 # drift on file lists.
@@ -17,6 +18,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(KENGINE_SANITIZE "Build with AddressSanitizer + UBSan (GCC/Clang)" OFF)
 option(KENGINE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+option(KENGINE_BUILD_EDITOR_SPIKE "Build the Qt6 + Direct3D 11 viewport spike (Windows only, UNVERIFIED)" OFF)
+
+if(MSVC)
+  # Report the real C++ standard in __cplusplus, treat sources as UTF-8, strict conformance.
+  add_compile_options(/Zc:__cplusplus /utf-8 /permissive-)
+endif()
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
@@ -59,4 +66,8 @@ if(Python3_Interpreter_FOUND)
                    ${Python3_EXECUTABLE} -m unittest discover -s "${CMAKE_SOURCE_DIR}/Tests/CLI" -v)
 else()
   message(WARNING "Python 3 not found: the CLI tests are NOT registered (reported as not-run, not as passed).")
+endif()
+
+if(KENGINE_BUILD_EDITOR_SPIKE)
+  add_subdirectory(Editor/Spike)
 endif()

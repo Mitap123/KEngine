@@ -19,8 +19,8 @@ No third-party library is linked into `Engine/`, `k` or the tests. The JSON pars
 | Candidate | Purpose | Milestone | License (UNVERIFIED) | Notes / action before adoption |
 |---|---|---|---|---|
 | CMake + Ninja | primary build | M0-T04 follow-up | BSD-3 / Apache-2.0 | Not installed in dev env. |
-| Qt 6 (Core, Gui, Widgets, OpenGL widgets) | Editor UI | M0.5 | LGPLv3/GPLv3/commercial, module-dependent | **Unknown obligations flagged**: see ADR-0005. Editor-only. |
-| OpenGL 3.3 core (system driver/Mesa) | first renderer backend | M0.5 | n/a (system API) | ADR-0004 spike needed. |
+| Qt 6 (Core, Gui, Widgets only) | Editor UI | M0.5 | LGPLv3/GPLv3/commercial, module-dependent | **Unknown obligations flagged**: see ADR-0005. Editor-only. |
+| Direct3D 11 + DXGI + D3DCompiler (Windows system API; Windows SDK or MinGW-w64 headers) | first renderer backend (feature level 10_1 floor) | M0.5 | system component; SDK/headers license terms **UNVERIFIED** | ADR-0004. `d3dcompiler_47.dll` ships with recent Windows; older systems may need it redistributed (**UNVERIFIED**). OpenGL 3.3 was rejected. |
 | ECS: flecs / EnTT / custom | runtime world | M1 | MIT (both, believed) | Benchmark + license check first (ADR-0001). |
 | nanobind / pybind11 / raw CPython API | Python binding | M2 | BSD-3 (believed) / PSF | ADR-0007; headers for CPython 3.12 present, bindings libs absent. |
 | Rust toolchain (cargo) | Rust SDK | M5 | MIT/Apache-2.0 (believed) | Not installed. |

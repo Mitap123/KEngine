@@ -50,9 +50,15 @@ CMake is written but UNVERIFIED (no cmake in the original dev environment); see 
 - Prefer failure-path tests. Do not weaken a test to pass without recording the decision (ADR).
 - Never serialize Handles or addresses. Only UUIDs are persistent.
 
+## Hardware floor and platform rules
+- Target hardware floor (owner requirement): **Direct3D 10.1** class GPU (Intel Core i5-560M iGPU). Renderer: Direct3D 11 API at feature level 10_1 (ADR-0004). Shaders Shader Model 4.0 only; no compute/tessellation/MSAA by default; render on demand.
+- `Engine/*` is portable and API-neutral; renderers consume only `DrawList`. Only `Editor/` may use Windows/Direct3D/Qt. Use Qt **Widgets** only (no Qt Quick/QRhi/QOpenGLWidget).
+- Math/coordinate conventions are fixed by ADR-0010 (right-handed, +Y up, row-major `Mat4`, column vectors, Euler `Ry*Rx*Rz`, local transforms, CCW front faces, depth [0,1]). Do not change them without an ADR and a schema bump.
+- Windows/Direct3D/Qt code in this repo is UNVERIFIED until the owner runs it; never describe it as working.
+
 ## Known open risks (details in ADRs)
-- Handles do not name their container (ADR-0003): introduce typed handles before Runtime work.
-- Renderer/Qt choice unverified (ADR-0004); Qt licensing undecided (ADR-0005); project license not chosen.
+- Handles are domain-typed, but two scenes share a handle type (ADR-0003): use UUIDs across scenes.
+- Renderer/Qt path unverified on real hardware (ADR-0004); Qt licensing undecided (ADR-0005); project license not chosen.
 
 ## Required project records
 Maintain `ARCHITECTURE.md`, `ROADMAP.md`, `FEATURE_MATRIX.md`, `DEVELOPMENT_STATUS.md`, `DEPENDENCIES.md`, `BUILDING.md`, `TESTING.md`, ADRs and `TASKS.json`/`TASKS.md` as relevant. Keep this file concise (under 150 lines); put details in those documents.

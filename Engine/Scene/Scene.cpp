@@ -32,22 +32,22 @@ bool is_finite(const Transform& t) {
 }
 
 namespace {
-Error invalid_handle(Handle h, HandleStatus s) {
+Error invalid_handle(ObjectHandle h, HandleStatus s) {
     return make_error("scene.invalid_handle",
                       std::string("handle {index=") + std::to_string(h.index) +
                           ", generation=" + std::to_string(h.generation) + "} is " + to_string(s));
 }
 }  // namespace
 
-Result<Handle> Scene::create(ObjectKind kind, std::string name, Handle parent) {
+Result<ObjectHandle> Scene::create(ObjectKind kind, std::string name, ObjectHandle parent) {
     // Regenerate on the (astronomically unlikely) collision rather than fail.
     Uuid id = Uuid::generate();
     while (by_uuid_.count(id) != 0) id = Uuid::generate();
     return create_with_uuid(id, kind, std::move(name), parent);
 }
 
-Result<Handle> Scene::create_with_uuid(const Uuid& id, ObjectKind kind, std::string name,
-                                       Handle parent) {
+Result<ObjectHandle> Scene::create_with_uuid(const Uuid& id, ObjectKind kind, std::string name,
+                                       ObjectHandle parent) {
     if (id.is_nil()) {
         return make_error("scene.nil_uuid", "an object cannot have the nil UUID");
     }
@@ -64,7 +64,7 @@ Result<Handle> Scene::create_with_uuid(const Uuid& id, ObjectKind kind, std::str
     obj.name = std::move(name);
     obj.kind = kind;
     obj.parent = parent;
-    const Handle h = objects_.insert(std::move(obj));  // may reallocate: fetch parent AFTER this
+    const ObjectHandle h = objects_.insert(std::move(obj));  // may reallocate: fetch parent AFTER this
     by_uuid_.emplace(id, h);
     if (parent.is_null()) {
         roots_.push_back(h);
@@ -74,8 +74,8 @@ Result<Handle> Scene::create_with_uuid(const Uuid& id, ObjectKind kind, std::str
     return h;
 }
 
-void Scene::detach_from_parent(Handle h, const SceneObject& o) {
-    std::vector<Handle>* siblings = &roots_;
+void Scene::detach_from_parent(ObjectHandle h, const SceneObject& o) {
+    std::vector<ObjectHandle>* siblings = &roots_;
     if (!o.parent.is_null()) {
         SceneObject* p = objects_.get(o.parent);
         siblings = &p->children;
@@ -83,7 +83,7 @@ void Scene::detach_from_parent(Handle h, const SceneObject& o) {
     siblings->erase(std::remove(siblings->begin(), siblings->end(), h), siblings->end());
 }
 
-Status Scene::destroy(Handle h) {
+Status Scene::destroy(ObjectHandle h) {
     const HandleStatus st = objects_.status(h);
     if (st != HandleStatus::Valid) return invalid_handle(h, st);
 
@@ -91,26 +91,26 @@ Status Scene::destroy(Handle h) {
 
     // Collect the subtree first (iteratively), then erase, so no pointer into
     // the slot storage is used while it is being modified.
-    std::vector<Handle> doomed{h};
+    std::vector<ObjectHandle> doomed{h};
     for (std::size_t i = 0; i < doomed.size(); ++i) {
         const SceneObject* o = objects_.get(doomed[i]);
         doomed.insert(doomed.end(), o->children.begin(), o->children.end());
     }
-    for (Handle d : doomed) {
+    for (ObjectHandle d : doomed) {
         by_uuid_.erase(objects_.get(d)->id);
         objects_.erase(d);
     }
     return Status::success();
 }
 
-Status Scene::reparent(Handle h, Handle new_parent) {
+Status Scene::reparent(ObjectHandle h, ObjectHandle new_parent) {
     if (const HandleStatus st = objects_.status(h); st != HandleStatus::Valid) return invalid_handle(h, st);
     if (!new_parent.is_null()) {
         if (const HandleStatus st = objects_.status(new_parent); st != HandleStatus::Valid) {
             return invalid_handle(new_parent, st);
         }
         // Reject h itself or any descendant of h as the new parent.
-        for (Handle cur = new_parent; !cur.is_null(); cur = objects_.get(cur)->parent) {
+        for (ObjectHandle cur = new_parent; !cur.is_null(); cur = objects_.get(cur)->parent) {
             if (cur == h) {
                 return make_error("scene.cycle", "cannot make an object a descendant of itself");
             }
@@ -127,14 +127,14 @@ Status Scene::reparent(Handle h, Handle new_parent) {
     return Status::success();
 }
 
-Status Scene::set_name(Handle h, std::string name) {
+Status Scene::set_name(ObjectHandle h, std::string name) {
     SceneObject* o = objects_.get(h);
     if (!o) return invalid_handle(h, objects_.status(h));
     o->name = std::move(name);
     return Status::success();
 }
 
-Status Scene::set_transform(Handle h, const Transform& t) {
+Status Scene::set_transform(ObjectHandle h, const Transform& t) {
     SceneObject* o = objects_.get(h);
     if (!o) return invalid_handle(h, objects_.status(h));
     if (!is_finite(t)) {
@@ -144,9 +144,9 @@ Status Scene::set_transform(Handle h, const Transform& t) {
     return Status::success();
 }
 
-Handle Scene::find_by_uuid(const Uuid& id) const {
+ObjectHandle Scene::find_by_uuid(const Uuid& id) const {
     auto it = by_uuid_.find(id);
-    return it == by_uuid_.end() ? kNullHandle : it->second;
+    return it == by_uuid_.end() ? kNullObjectHandle : it->second;
 }
 
 }  // namespace k

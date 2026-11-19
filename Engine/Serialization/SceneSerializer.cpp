@@ -123,7 +123,7 @@ Json scene_to_json(const Scene& scene) {
     root.set("schema_version", Json::number(kSceneSchemaVersion));
 
     Json objects = Json::array();
-    scene.visit_preorder([&](Handle, const SceneObject& o) {
+    scene.visit_preorder([&](ObjectHandle, const SceneObject& o) {
         Json j = Json::object();
         j.set("id", Json::string(o.id.to_string()));
         j.set("name", Json::string(o.name));
@@ -192,7 +192,7 @@ Result<LoadedScene> scene_from_json(const Json& root) {
     }
 
     // Pass 1: create every object (as a root) so parents may appear anywhere.
-    std::vector<Handle> handles;
+    std::vector<ObjectHandle> handles;
     handles.reserve(records.size());
     for (const Record& r : records) {
         auto h = out.scene.create_with_uuid(r.id, r.kind, r.name);
@@ -208,7 +208,7 @@ Result<LoadedScene> scene_from_json(const Json& root) {
     // Pass 2: link parents in file order, which preserves sibling order.
     for (std::size_t i = 0; i < records.size(); ++i) {
         if (!records[i].parent) continue;
-        const Handle parent = out.scene.find_by_uuid(*records[i].parent);
+        const ObjectHandle parent = out.scene.find_by_uuid(*records[i].parent);
         if (parent.is_null()) {
             return make_error("scene.object.missing_parent",
                               records[i].path + "/parent: no object has UUID " + records[i].parent->to_string());

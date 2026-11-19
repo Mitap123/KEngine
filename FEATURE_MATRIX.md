@@ -16,8 +16,13 @@ Statuses: PLANNED, PROTOTYPE, IMPLEMENTED, TESTED, STABLE, BLOCKED. Each status 
 | CMake build | PROTOTYPE | written, never executed (no cmake available) |
 | CI workflow | PLANNED | M0-T06 |
 | Project creation / manifest | PLANNED | |
-| Qt Editor shell (docks) | BLOCKED | Qt 6 not installed; no network |
-| Viewport rendering, picking, screenshot probe | BLOCKED | no Qt/GL dev stack/GPU; ADR-0004 unverified |
+| Domain-typed handles (`ObjectHandle`; cross-domain use is a compile error) | TESTED | `static_assert`s in `test_handle.cpp`, compile-fail check |
+| Math (Mat4/Vec3), scene local/world transforms | TESTED | `test_math.cpp`, `test_rendering_geometry.cpp` (incl. depth-100,000 chains) |
+| Primitive meshes (cube/sphere/plane), orbit camera, screen rays, CPU picking, DrawList | TESTED | `test_rendering_geometry.cpp`, `test_camera_picking.cpp`; 12 mutation checks |
+| Direct3D 11 renderer (feature level 10_1 target), GPU probe | PROTOTYPE | written, **never compiled/run**; stub-level syntax check only |
+| Qt viewport widget + spike app (orbit/pan/zoom/select/screenshot) | PROTOTYPE | written, **never compiled/run** |
+| Qt Editor shell (docks, explorer, inspector) | BLOCKED | needs the owner's Windows/Qt machine; not started |
+| Viewport verified on the target GPU (i5-560M iGPU, D3D 10.1) | BLOCKED | waiting for the owner to run `k_gpu_probe` / `k_viewport_spike` |
 | Selection sync, transform editing UI | BLOCKED | depends on Editor shell |
 | Undo/Redo command history | PLANNED | engine-side core can proceed without Qt |
 | Play/Stop isolation | PLANNED | engine-side core can proceed without Qt; ADR-0003 handle-domain risk to address first |

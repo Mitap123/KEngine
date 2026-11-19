@@ -6,7 +6,7 @@
 //
 // Identity:
 //   * Every object has a persistent Uuid (unique within a Scene, never nil).
-//   * Live references use Handle. Handles are only valid for the Scene that
+//   * Live references use ObjectHandle. Handles are only valid for the Scene that
 //     issued them and are invalidated when the object is destroyed.
 //
 // Hierarchy: objects form a forest. Destroying an object destroys all of its
@@ -16,7 +16,8 @@
 // editor/authoring thread) at a time.
 //
 // Units/representation (scene format v1): positions in scene units; rotation
-// is Euler angles in degrees; scale is per-axis. All components must be
+// is Euler angles in degrees composed as Ry*Rx*Rz (ADR-0010); scale is per-axis.
+// A transform is LOCAL: relative to the parent object (identity parent for roots). All components must be
 // finite (NaN/Inf are rejected), so scenes are always serializable.
 #pragma once
 
@@ -30,10 +31,9 @@
 #include "Engine/Core/Result.h"
 #include "Engine/Identity/Handle.h"
 #include "Engine/Identity/Uuid.h"
+#include "Engine/Math/Vec3.h"
 
 namespace k {
-
-using Vec3 = std::array<double, 3>;
 
 enum class ObjectKind : std::uint8_t { Empty, Cube, Sphere, Plane };
 
@@ -57,43 +57,43 @@ struct SceneObject {
     std::string name;
     ObjectKind kind = ObjectKind::Empty;
     Transform transform;
-    Handle parent = kNullHandle;       // null for root objects
-    std::vector<Handle> children;      // ordered
+    ObjectHandle parent = kNullObjectHandle;       // null for root objects
+    std::vector<ObjectHandle> children;      // ordered
 };
 
 class Scene {
 public:
     // Creates an object with a freshly generated UUID. `parent` must be null
     // (root) or a valid handle. Error codes: scene.invalid_handle.
-    Result<Handle> create(ObjectKind kind, std::string name, Handle parent = kNullHandle);
+    Result<ObjectHandle> create(ObjectKind kind, std::string name, ObjectHandle parent = kNullObjectHandle);
 
     // Creates an object with a caller-supplied UUID (used by load and by
     // undo of a delete). Error codes: scene.nil_uuid, scene.duplicate_uuid,
     // scene.invalid_handle.
-    Result<Handle> create_with_uuid(const Uuid& id, ObjectKind kind, std::string name,
-                                    Handle parent = kNullHandle);
+    Result<ObjectHandle> create_with_uuid(const Uuid& id, ObjectKind kind, std::string name,
+                                    ObjectHandle parent = kNullObjectHandle);
 
     // Destroys the object and all descendants. Error: scene.invalid_handle.
-    Status destroy(Handle h);
+    Status destroy(ObjectHandle h);
 
     // Moves `h` under `new_parent` (null = make root), appended as last child.
     // Errors: scene.invalid_handle, scene.cycle (new_parent is h or a
     // descendant of h).
-    Status reparent(Handle h, Handle new_parent);
+    Status reparent(ObjectHandle h, ObjectHandle new_parent);
 
-    Status set_name(Handle h, std::string name);
+    Status set_name(ObjectHandle h, std::string name);
     // Errors: scene.invalid_handle, scene.non_finite_transform.
-    Status set_transform(Handle h, const Transform& t);
+    Status set_transform(ObjectHandle h, const Transform& t);
 
     // Lookup. get() returns nullptr unless the handle is Valid. The pointer
     // is invalidated by create*/destroy; do not retain it.
-    const SceneObject* get(Handle h) const { return objects_.get(h); }
-    HandleStatus status(Handle h) const { return objects_.status(h); }
+    const SceneObject* get(ObjectHandle h) const { return objects_.get(h); }
+    HandleStatus status(ObjectHandle h) const { return objects_.status(h); }
 
-    // Returns kNullHandle if no object has this UUID.
-    Handle find_by_uuid(const Uuid& id) const;
+    // Returns kNullObjectHandle if no object has this UUID.
+    ObjectHandle find_by_uuid(const Uuid& id) const;
 
-    const std::vector<Handle>& roots() const { return roots_; }
+    const std::vector<ObjectHandle>& roots() const { return roots_; }
     std::size_t object_count() const { return objects_.size(); }
 
     // Preorder traversal (parent before children, siblings in order).
@@ -101,9 +101,9 @@ public:
     // Do not mutate the scene from inside `fn`.
     template <class Fn>
     void visit_preorder(Fn&& fn) const {
-        std::vector<Handle> stack(roots_.rbegin(), roots_.rend());
+        std::vector<ObjectHandle> stack(roots_.rbegin(), roots_.rend());
         while (!stack.empty()) {
-            const Handle h = stack.back();
+            const ObjectHandle h = stack.back();
             stack.pop_back();
             const SceneObject* o = objects_.get(h);
             if (!o) continue;
@@ -113,11 +113,11 @@ public:
     }
 
 private:
-    void detach_from_parent(Handle h, const SceneObject& o);
+    void detach_from_parent(ObjectHandle h, const SceneObject& o);
 
-    SlotMap<SceneObject> objects_;
-    std::unordered_map<Uuid, Handle, Uuid::Hash> by_uuid_;
-    std::vector<Handle> roots_;
+    SlotMap<SceneObject, ObjectHandle> objects_;
+    std::unordered_map<Uuid, ObjectHandle, Uuid::Hash> by_uuid_;
+    std::vector<ObjectHandle> roots_;
 };
 
 }  // namespace k

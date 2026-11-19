@@ -145,7 +145,7 @@ Check check_scene_round_trip() {
     if (!loaded) return {"scene_round_trip", false, loaded.error().message};
 
     const k::Scene& r = loaded.value().scene;
-    const k::Handle h = r.find_by_uuid(cube_id);
+    const k::ObjectHandle h = r.find_by_uuid(cube_id);
     if (r.object_count() != 2 || h.is_null() || !(r.get(h)->transform == t))
         return {"scene_round_trip", false, "loaded scene differs from the saved scene"};
     return {"scene_round_trip", true, "scene survives save/load with UUIDs, hierarchy and transforms"};

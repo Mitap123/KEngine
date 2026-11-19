@@ -1,3 +1,4 @@
+#include <type_traits>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -164,4 +165,47 @@ KTEST(handle_randomized_model_check_never_resurrects_stale_handles) {
     for (const Entry& e : model) {
         KCHECK_EQ(m.contains(e.h), e.alive);
     }
+}
+
+// ---- Domain-typed handles (ADR-0003, M05-T02b) -----------------------------
+// These are compile-time guarantees: if they regress, the build fails.
+
+namespace {
+struct OtherTag;
+using OtherHandle = k::BasicHandle<OtherTag>;
+
+template <class Map, class H>
+concept CanLookUp = requires(Map m, H h) { m.get(h); };
+template <class Map, class H>
+concept CanErase = requires(Map m, H h) { m.erase(h); };
+}  // namespace
+
+static_assert(!std::is_convertible_v<k::ObjectHandle, OtherHandle>, "handles of different domains must not convert");
+static_assert(!std::is_convertible_v<OtherHandle, k::ObjectHandle>);
+static_assert(!std::is_convertible_v<k::ObjectHandle, k::Handle>, "typed handle must not decay to the untyped one");
+static_assert(!std::is_convertible_v<k::Handle, k::ObjectHandle>);
+static_assert(!std::is_constructible_v<k::ObjectHandle, OtherHandle>);
+static_assert(!std::is_constructible_v<k::ObjectHandle, k::Handle>);
+static_assert(!std::is_same_v<k::ObjectHandle, k::Handle>);
+static_assert(sizeof(k::ObjectHandle) == 8 && std::is_trivially_copyable_v<k::ObjectHandle>);
+
+// A map only accepts the handle type of its own domain.
+static_assert(CanLookUp<k::SlotMap<int, k::ObjectHandle>, k::ObjectHandle>);
+static_assert(!CanLookUp<k::SlotMap<int, k::ObjectHandle>, OtherHandle>);
+static_assert(!CanLookUp<k::SlotMap<int, k::ObjectHandle>, k::Handle>);
+static_assert(!CanErase<k::SlotMap<int, k::ObjectHandle>, OtherHandle>);
+static_assert(CanLookUp<k::SlotMap<int>, k::Handle>);  // default stays untyped
+static_assert(!CanLookUp<k::SlotMap<int>, k::ObjectHandle>);
+
+KTEST(handle_typed_map_behaves_like_untyped_map) {
+    k::SlotMap<int, k::ObjectHandle> m;
+    const k::ObjectHandle a = m.insert(1);
+    KCHECK(m.get(a) != nullptr && *m.get(a) == 1);
+    KCHECK(m.erase(a));
+    KCHECK(m.status(a) == k::HandleStatus::Stale);
+    KCHECK(m.status(k::kNullObjectHandle) == k::HandleStatus::Null);
+    const k::ObjectHandle b = m.insert(2);
+    KCHECK_EQ(a.index, b.index);
+    KCHECK(b.generation > a.generation);
+    KCHECK(m.get(a) == nullptr);
 }

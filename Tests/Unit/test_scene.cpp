@@ -9,10 +9,10 @@
 using namespace k;
 
 namespace {
-Handle must_create(Scene& s, ObjectKind kind, const char* name, Handle parent = kNullHandle) {
+ObjectHandle must_create(Scene& s, ObjectKind kind, const char* name, ObjectHandle parent = kNullObjectHandle) {
     auto r = s.create(kind, name, parent);
     KCHECK(r.ok());
-    return r.ok() ? r.value() : kNullHandle;
+    return r.ok() ? r.value() : kNullObjectHandle;
 }
 std::string code_of(const Status& st) { return st.ok() ? std::string() : st.error().code; }
 }  // namespace
@@ -21,7 +21,7 @@ KTEST(scene_create_assigns_unique_non_nil_uuids_and_defaults) {
     Scene s;
     std::set<std::string> uuids;
     for (int i = 0; i < 100; ++i) {
-        Handle h = must_create(s, ObjectKind::Cube, "Cube");
+        ObjectHandle h = must_create(s, ObjectKind::Cube, "Cube");
         const SceneObject* o = s.get(h);
         KCHECK(o != nullptr);
         if (!o) continue;
@@ -39,7 +39,7 @@ KTEST(scene_create_assigns_unique_non_nil_uuids_and_defaults) {
 
 KTEST(scene_destroy_invalidates_handle_and_removes_uuid_lookup) {
     Scene s;
-    Handle h = must_create(s, ObjectKind::Sphere, "S");
+    ObjectHandle h = must_create(s, ObjectKind::Sphere, "S");
     const Uuid id = s.get(h)->id;
     KCHECK(s.destroy(h).ok());
     KCHECK(s.get(h) == nullptr);
@@ -52,9 +52,9 @@ KTEST(scene_destroy_invalidates_handle_and_removes_uuid_lookup) {
 
 KTEST(scene_stale_handle_does_not_resolve_to_object_reusing_its_slot) {
     Scene s;
-    Handle a = must_create(s, ObjectKind::Cube, "A");
+    ObjectHandle a = must_create(s, ObjectKind::Cube, "A");
     KCHECK(s.destroy(a).ok());
-    Handle b = must_create(s, ObjectKind::Plane, "B");  // reuses A's slot
+    ObjectHandle b = must_create(s, ObjectKind::Plane, "B");  // reuses A's slot
     KCHECK_EQ(a.index, b.index);
     KCHECK(a != b);
     KCHECK(s.get(a) == nullptr);
@@ -63,23 +63,23 @@ KTEST(scene_stale_handle_does_not_resolve_to_object_reusing_its_slot) {
     KCHECK_EQ(code_of(s.set_name(a, "hijack")), std::string("scene.invalid_handle"));
     KCHECK_EQ(code_of(s.set_transform(a, Transform{})), std::string("scene.invalid_handle"));
     KCHECK_EQ(code_of(s.destroy(a)), std::string("scene.invalid_handle"));
-    KCHECK_EQ(code_of(s.reparent(a, kNullHandle)), std::string("scene.invalid_handle"));
+    KCHECK_EQ(code_of(s.reparent(a, kNullObjectHandle)), std::string("scene.invalid_handle"));
     KCHECK(s.get(b) != nullptr && s.get(b)->name == "B");
 }
 
 KTEST(scene_hierarchy_and_destroy_subtree) {
     Scene s;
-    Handle root = must_create(s, ObjectKind::Empty, "root");
-    Handle c1 = must_create(s, ObjectKind::Cube, "c1", root);
-    Handle c2 = must_create(s, ObjectKind::Cube, "c2", root);
-    Handle g = must_create(s, ObjectKind::Sphere, "g", c1);
-    Handle other = must_create(s, ObjectKind::Plane, "other");
+    ObjectHandle root = must_create(s, ObjectKind::Empty, "root");
+    ObjectHandle c1 = must_create(s, ObjectKind::Cube, "c1", root);
+    ObjectHandle c2 = must_create(s, ObjectKind::Cube, "c2", root);
+    ObjectHandle g = must_create(s, ObjectKind::Sphere, "g", c1);
+    ObjectHandle other = must_create(s, ObjectKind::Plane, "other");
 
     KCHECK_EQ(s.get(root)->children.size(), static_cast<std::size_t>(2));
     KCHECK(s.get(g)->parent == c1);
 
     std::vector<std::string> order;
-    s.visit_preorder([&](Handle, const SceneObject& o) { order.push_back(o.name); });
+    s.visit_preorder([&](ObjectHandle, const SceneObject& o) { order.push_back(o.name); });
     KCHECK_EQ(order.size(), static_cast<std::size_t>(5));
     if (order.size() == 5) {
         KCHECK_EQ(order[0], std::string("root"));
@@ -102,13 +102,13 @@ KTEST(scene_hierarchy_and_destroy_subtree) {
 
 KTEST(scene_create_with_bad_parent_fails_without_side_effects) {
     Scene s;
-    Handle p = must_create(s, ObjectKind::Empty, "p");
+    ObjectHandle p = must_create(s, ObjectKind::Empty, "p");
     KCHECK(s.destroy(p).ok());
     auto r = s.create(ObjectKind::Cube, "orphan", p);  // stale parent
     KCHECK(!r.ok());
     if (!r.ok()) KCHECK_EQ(r.error().code, std::string("scene.invalid_handle"));
     KCHECK_EQ(s.object_count(), static_cast<std::size_t>(0));
-    KCHECK(s.create(ObjectKind::Cube, "forged", Handle{77, 1}).ok() == false);
+    KCHECK(s.create(ObjectKind::Cube, "forged", ObjectHandle{77, 1}).ok() == false);
 }
 
 KTEST(scene_create_with_uuid_rejects_nil_and_duplicates) {
@@ -131,10 +131,10 @@ KTEST(scene_create_with_uuid_rejects_nil_and_duplicates) {
 
 KTEST(scene_reparent_moves_appends_and_rejects_cycles) {
     Scene s;
-    Handle a = must_create(s, ObjectKind::Empty, "a");
-    Handle b = must_create(s, ObjectKind::Empty, "b", a);
-    Handle c = must_create(s, ObjectKind::Empty, "c", b);
-    Handle d = must_create(s, ObjectKind::Empty, "d");
+    ObjectHandle a = must_create(s, ObjectKind::Empty, "a");
+    ObjectHandle b = must_create(s, ObjectKind::Empty, "b", a);
+    ObjectHandle c = must_create(s, ObjectKind::Empty, "c", b);
+    ObjectHandle d = must_create(s, ObjectKind::Empty, "d");
 
     KCHECK_EQ(code_of(s.reparent(a, a)), std::string("scene.cycle"));
     KCHECK_EQ(code_of(s.reparent(a, c)), std::string("scene.cycle"));  // under own descendant
@@ -146,7 +146,7 @@ KTEST(scene_reparent_moves_appends_and_rejects_cycles) {
     KCHECK(s.get(b)->children.empty());
     KCHECK_EQ(s.get(d)->children.size(), static_cast<std::size_t>(1));
 
-    KCHECK(s.reparent(b, kNullHandle).ok());                           // to root, appended last
+    KCHECK(s.reparent(b, kNullObjectHandle).ok());                           // to root, appended last
     KCHECK_EQ(s.roots().size(), static_cast<std::size_t>(3));
     KCHECK(s.roots().back() == b);
     KCHECK(s.get(a)->children.empty());
@@ -154,7 +154,7 @@ KTEST(scene_reparent_moves_appends_and_rejects_cycles) {
 
 KTEST(scene_set_transform_validates_and_set_name_works) {
     Scene s;
-    Handle h = must_create(s, ObjectKind::Cube, "c");
+    ObjectHandle h = must_create(s, ObjectKind::Cube, "c");
     Transform t;
     t.position = {1, 2, 3};
     t.rotation_euler_deg = {10, 20, 30};
@@ -189,12 +189,12 @@ KTEST(scene_object_kind_names_round_trip) {
 
 KTEST(scene_very_deep_hierarchy_does_not_overflow_the_stack) {
     Scene s;
-    Handle cur = must_create(s, ObjectKind::Empty, "n0");
-    const Handle top = cur;
+    ObjectHandle cur = must_create(s, ObjectKind::Empty, "n0");
+    const ObjectHandle top = cur;
     constexpr int kDepth = 100000;
     for (int i = 1; i < kDepth; ++i) cur = must_create(s, ObjectKind::Empty, "n", cur);
     std::size_t visited = 0;
-    s.visit_preorder([&](Handle, const SceneObject&) { ++visited; });
+    s.visit_preorder([&](ObjectHandle, const SceneObject&) { ++visited; });
     KCHECK_EQ(visited, static_cast<std::size_t>(kDepth));
     KCHECK(s.destroy(top).ok());
     KCHECK_EQ(s.object_count(), static_cast<std::size_t>(0));

@@ -203,7 +203,7 @@
         {
           "id": "M05-T01",
           "title": "Create Qt application shell and dock layout",
-          "status": "blocked",
+          "status": "pending",
           "priority": "P0",
           "depends_on": [
             "M0-T04"
@@ -226,7 +226,7 @@
             "Full command palette and theme system"
           ],
           "evidence": [],
-          "notes": "Blocked by environment: Qt 6 and cmake not installed, no network. See ADR-0004/0005."
+          "notes": "Unblocked in principle: the owner has Qt 6 + CMake on Windows. Not started; do it after the spike results (M05-T03b) so the Editor shell is built on a verified viewport path. Use Qt Widgets only (ADR-0004)."
         },
         {
           "id": "M05-T02",
@@ -271,7 +271,7 @@
         {
           "id": "M05-T02b",
           "title": "Introduce domain-typed handles (ADR-0003 risk)",
-          "status": "pending",
+          "status": "done",
           "priority": "P0",
           "depends_on": [
             "M05-T02"
@@ -292,17 +292,73 @@
             "static_assert tests for non-convertibility"
           ],
           "verification_commands": [
-            "make STRICT=1 check"
+            "make STRICT=1 test",
+            "make SANITIZE=1 STRICT=1 test"
           ],
           "out_of_scope": [
             "Runtime World/ECS",
             "C ABI packing (ADR-0007)"
-          ]
+          ],
+          "evidence": [
+            "Engine/Identity/Handle.h",
+            "Tests/Unit/test_handle.cpp"
+          ],
+          "notes": "BasicHandle<Tag>, ObjectHandle; cross-domain use is a compile error (static_asserts + compile-fail check). Two Scene instances still share a handle type (documented in ADR-0003)."
+        },
+        {
+          "id": "M05-T03a",
+          "title": "Qt-free viewport support: math, primitives, camera, picking, draw list",
+          "status": "done",
+          "priority": "P0",
+          "depends_on": [
+            "M05-T02b"
+          ],
+          "scope": [
+            "Engine/Math",
+            "Engine/Rendering",
+            "Engine/Scene",
+            "Tests/Unit"
+          ],
+          "evidence": [
+            "ADR-0010",
+            "Tests/Unit/test_math.cpp",
+            "Tests/Unit/test_rendering_geometry.cpp",
+            "Tests/Unit/test_camera_picking.cpp"
+          ],
+          "verification_commands": [
+            "make STRICT=1 check",
+            "make SANITIZE=1 STRICT=1 check",
+            "make BUILD_TYPE=Release STRICT=1 check"
+          ],
+          "notes": "12 mutation checks all caught. No pixels are drawn by this code."
+        },
+        {
+          "id": "M05-T03b",
+          "title": "Verify the Direct3D 11 (feature level 10_1) viewport spike on the target hardware",
+          "status": "blocked",
+          "priority": "P0",
+          "depends_on": [
+            "M05-T03a"
+          ],
+          "scope": [
+            "Editor/Spike"
+          ],
+          "acceptance_criteria": [
+            "k_gpu_probe output recorded for the i5-560M machine (adapter, feature level)",
+            "k_viewport_spike renders ground, cube, sphere, child cube; orbit/pan/zoom/select work",
+            "--screenshot --no-warp writes a non-blank PNG and exits 0",
+            "ADR-0004 updated with the recorded results; any compile fixes applied"
+          ],
+          "verification_plan": [
+            "Follow Editor/Spike/README.md steps 0-3 on the owner's machine"
+          ],
+          "verification_commands": [],
+          "notes": "BLOCKED on the owner running the spike (code is unverified). Cannot be done in the Linux sandbox."
         },
         {
           "id": "M05-T03",
           "title": "Render basic primitives in the Editor viewport",
-          "status": "blocked",
+          "status": "partial",
           "priority": "P0",
           "depends_on": [
             "M0-T03",
@@ -326,7 +382,7 @@
             "PBR, shadows and multiple graphics backends"
           ],
           "evidence": [],
-          "notes": "Blocked by environment (no Qt/GL dev stack/GPU). ADR-0004 spike required first."
+          "notes": "Split: M05-T03a (Qt-free viewport support) is done and tested; M05-T03b (spike verified on target GPU) waits for the owner. Full task also needs the viewport inside the Editor shell (M05-T01)."
         },
         {
           "id": "M05-T04",

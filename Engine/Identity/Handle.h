@@ -15,6 +15,8 @@
 //     so the counter cannot wrap around and resurrect an old handle.
 //   * A Handle holds no pointer; resolving one always goes through its owner.
 //
+// Requires T to be default-constructible and move-assignable.
+//
 // Threading: SlotMap has no internal synchronization. It follows the
 // thread-affinity of its owner (for Scene: the authoring/editor thread).
 #pragma once
@@ -27,15 +29,29 @@
 
 namespace k {
 
-struct Handle {
+// A handle is typed by a Tag so that handles of different domains are
+// different, non-convertible C++ types (ADR-0003): an authoring ObjectHandle can
+// never be passed where a runtime handle is expected, nor used with a
+// SlotMap of another domain — that is a compile error, not a silent alias.
+template <class Tag>
+struct BasicHandle {
     std::uint32_t index = 0;
-    std::uint32_t generation = 0;  // 0 is never a valid generation: Handle{} is the null handle
+    std::uint32_t generation = 0;  // 0 is never a valid generation: BasicHandle{} is the null handle
 
     constexpr bool is_null() const { return generation == 0; }
-    friend constexpr bool operator==(const Handle&, const Handle&) = default;
+    friend constexpr bool operator==(const BasicHandle&, const BasicHandle&) = default;
 };
 
+// Untyped handle: for generic containers and tests only. Domain code uses a
+// dedicated typed handle.
+struct UntypedTag;
+using Handle = BasicHandle<UntypedTag>;
 inline constexpr Handle kNullHandle{};
+
+// Authoring-layer object (Engine/Scene).
+struct ObjectTag;
+using ObjectHandle = BasicHandle<ObjectTag>;
+inline constexpr ObjectHandle kNullObjectHandle{};
 
 enum class HandleStatus : std::uint8_t {
     Valid,
@@ -54,15 +70,17 @@ constexpr const char* to_string(HandleStatus s) {
     return "unknown";
 }
 
-template <class T>
+template <class T, class H = Handle>
 class SlotMap {
 public:
+    using handle_type = H;
+
     // `max_generation` is a test hook so generation exhaustion can be
     // exercised without 2^32 iterations. Production code uses the default.
     explicit SlotMap(std::uint32_t max_generation = std::numeric_limits<std::uint32_t>::max())
         : max_generation_(max_generation) {}
 
-    Handle insert(T value) {
+    H insert(T value) {
         std::uint32_t index;
         if (!free_.empty()) {
             index = free_.back();
@@ -76,10 +94,10 @@ public:
         slot.value = std::move(value);
         slot.alive = true;
         ++size_;
-        return Handle{index, slot.generation};
+        return H{index, slot.generation};
     }
 
-    HandleStatus status(Handle h) const {
+    HandleStatus status(H h) const {
         if (h.is_null()) return HandleStatus::Null;
         if (h.index >= slots_.size()) return HandleStatus::OutOfRange;
         const Slot& slot = slots_[h.index];
@@ -87,15 +105,15 @@ public:
         return HandleStatus::Valid;
     }
 
-    bool contains(Handle h) const { return status(h) == HandleStatus::Valid; }
+    bool contains(H h) const { return status(h) == HandleStatus::Valid; }
 
     // nullptr unless the handle is Valid. The pointer is only good until the
     // next insert() (storage may reallocate); do not store it.
-    T* get(Handle h) { return contains(h) ? &slots_[h.index].value : nullptr; }
-    const T* get(Handle h) const { return contains(h) ? &slots_[h.index].value : nullptr; }
+    T* get(H h) { return contains(h) ? &slots_[h.index].value : nullptr; }
+    const T* get(H h) const { return contains(h) ? &slots_[h.index].value : nullptr; }
 
     // Returns false (and changes nothing) for a null/stale/out-of-range handle.
-    bool erase(Handle h) {
+    bool erase(H h) {
         if (!contains(h)) return false;
         Slot& slot = slots_[h.index];
         slot.value = T{};  // release resources now rather than at slot reuse
@@ -119,7 +137,7 @@ public:
     void for_each(Fn&& fn) const {
         for (std::uint32_t i = 0; i < slots_.size(); ++i) {
             const Slot& s = slots_[i];
-            if (s.alive) fn(Handle{i, s.generation}, s.value);
+            if (s.alive) fn(H{i, s.generation}, s.value);
         }
     }
 

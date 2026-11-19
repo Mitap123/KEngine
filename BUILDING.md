@@ -27,8 +27,11 @@ ctest --test-dir Build/cmake --output-on-failure
 ```
 Record the outcome (date, cmake version, result) here when it is run. Until then treat it as unverified. See ADR-0009.
 
-## Not buildable yet
-The Qt Editor, renderer, Runtime, Python/C++/Rust SDKs do not exist. Qt 6 is not installed in the dev environment (ADR-0004/0005).
+## Windows (owner's machine) — UNVERIFIED
+The portable part is expected to build with MSVC (`/Zc:__cplusplus /utf-8 /permissive-` are set by CMake) or MinGW-w64, but this has never been tried. Follow `Editor/Spike/README.md`: Step 0 is `cmake` configure/build + `ctest` for the portable code (the first real run of `CMakeLists.txt`), then the GPU probe and the viewport spike (`-DKENGINE_BUILD_EDITOR_SPIKE=ON`, Windows only). Record results here.
+
+## Not buildable / not existing yet
+The Qt Editor shell, Runtime, Python/C++/Rust SDKs do not exist. The Direct3D 11 viewport spike exists but has never been compiled.
 
 ## Platform coverage
 Only Linux x86_64 + GCC 13.3 has been built and tested. The scene file code has an untested non-POSIX fallback (no fsync); Windows/macOS/Clang are unverified.

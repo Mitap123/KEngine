@@ -10,7 +10,7 @@ using namespace k;
 
 namespace {
 
-// Handle-independent snapshot of a scene, for before/after comparison.
+// ObjectHandle-independent snapshot of a scene, for before/after comparison.
 struct Snap {
     std::string id, name, kind, parent_id;
     Transform t;
@@ -19,7 +19,7 @@ struct Snap {
 
 std::vector<Snap> snapshot(const Scene& s) {
     std::vector<Snap> out;
-    s.visit_preorder([&](Handle, const SceneObject& o) {
+    s.visit_preorder([&](ObjectHandle, const SceneObject& o) {
         const SceneObject* p = s.get(o.parent);
         out.push_back({o.id.to_string(), o.name, to_string(o.kind), p ? p->id.to_string() : "", o.transform});
     });
@@ -72,7 +72,7 @@ KTEST(scene_serialization_round_trip_preserves_uuids_hierarchy_and_transforms) {
     KCHECK_EQ(r.roots().size(), s.roots().size());
 
     // UUIDs resolve to live objects with the same data in the loaded scene.
-    Handle h = r.find_by_uuid(s.get(cube.value())->id);
+    ObjectHandle h = r.find_by_uuid(s.get(cube.value())->id);
     KCHECK(!h.is_null());
     KCHECK(r.get(h) != nullptr && r.get(h)->transform == t);
 

@@ -6,6 +6,7 @@
 //   k_unit_tests --list          list case names
 #include <cstdio>
 #include <cstring>
+#include <exception>
 #include <string>
 
 #include "Tests/Unit/TestFramework.h"
@@ -46,7 +47,13 @@ int main(int argc, char** argv) {
         }
         ktest::reset_current_failures();
         std::printf("[ RUN  ] %s\n", c.name);
-        c.fn();
+        try {
+            c.fn();
+        } catch (const std::exception& e) {
+            ktest::fail(__FILE__, __LINE__, std::string("uncaught exception: ") + e.what());
+        } catch (...) {
+            ktest::fail(__FILE__, __LINE__, "uncaught non-standard exception");
+        }
         if (ktest::current_failures() == 0) {
             ++passed;
             std::printf("[  OK  ] %s\n", c.name);

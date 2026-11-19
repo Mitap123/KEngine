@@ -5,7 +5,7 @@ Reports must distinguish **passed / failed / skipped / not-run**. The unit runne
 ## Layers that exist
 | Layer | Location | Command | What it covers |
 |---|---|---|---|
-| Unit | `Tests/Unit/*.cpp` (in-repo `KTEST` harness) | `make test` | UUID, handles/SlotMap, Scene, JSON, scene serialization, scene file I/O (temp dirs under the system temp path, removed after each test) |
+| Unit | `Tests/Unit/*.cpp` (in-repo `KTEST` harness) | `make test` | UUID, handles/SlotMap (+ typed-handle compile-time checks), Scene, JSON, scene serialization, scene file I/O, math, world transforms, primitive meshes, orbit camera, picking, draw list (temp dirs under the system temp path, removed after each test) |
 | CLI | `Tests/CLI/test_cli.py` (Python `unittest`) | `make cli-test` | `k --version`, `--help`, `doctor` (+`--json`), usage errors, exit codes |
 | Sanitizers | same tests | `make SANITIZE=1 check` | ASan + UBSan on all of the above |
 
@@ -26,3 +26,9 @@ See `DEVELOPMENT_STATUS.md` ("Verification") for exact command output summaries 
 - Failure paths of the atomic save are exercised with the test-only `SaveOptions::fault_injection` hook (stages `create_temp`, `write`, `sync`, `backup`, `rename`). They prove cleanup and error mapping, not behaviour on a genuinely failing disk.
 - The suite was developed running as `root`, which ignores file permissions, so "read-only directory" cases are deliberately **not** tested; do not add permission-based tests without handling that.
 - The `KCHECK_EQ` macro copies its operands (a dangling-reference bug with rvalue-derived references was found and fixed during M05-T05).
+
+## Notes on rendering-support tests
+- Geometry is checked structurally, not by eye: unit normals, winding agrees with normals, no degenerate triangles, every directed edge matched by exactly one opposite edge (closed, consistently oriented surface), expected areas.
+- Picking and camera tests compare against hand-computed distances (e.g. rotated and non-uniformly scaled cubes, children of scaled/rotated parents) and round-trip projected points through `screen_ray`.
+- **Not tested:** anything that draws pixels. `Editor/Spike` (Direct3D 11, Qt) has never been compiled or run. Its syntax was checked only against hand-written stub headers (this catches typos/type errors, not API misuse).
+- The test runner now converts an uncaught exception into a reported failure instead of aborting.

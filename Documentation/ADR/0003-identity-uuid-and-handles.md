@@ -20,13 +20,13 @@ References must survive save/load and source control (persistent), yet live refe
 - UUID v7 (time-ordered; attractive for diffs) — not chosen: random v4 is simplest and sufficient; can be revisited since the text form is the same.
 
 ## Evidence (verified)
-`Tests/Unit/test_uuid.cpp`, `test_handle.cpp` (including a 20,000-step randomized model check and generation-exhaustion test), `test_scene.cpp`. Passed on Linux x86_64 / GCC 13.3 in Debug, Release and ASan+UBSan. A mutation check (deliberately breaking generation increment, stale check, retirement) made the tests fail.
+`Tests/Unit/test_uuid.cpp`, `test_handle.cpp` (including a 20,000-step randomized model check, generation-exhaustion test and compile-time typed-handle checks), `test_scene.cpp`. Passed on Linux x86_64 / GCC 13.3 in Debug, Release and ASan+UBSan. A mutation check (deliberately breaking generation increment, stale check, retirement) made the tests fail.
 
 ## Trade-offs
 `std::random_device` per UUID is slower than a cached engine; acceptable (authoring-time operation). A `Handle` does not name its container.
 
-## Known risk / open question (action required before M1)
-A `Handle` does not identify *which* container issued it. A copied `Scene` (e.g. the Play clone) has the same slot layout, so an Editor handle used against the clone would silently resolve to the clone's counterpart object. Planned mitigation before Runtime work: **distinct handle types per domain** (e.g. `ObjectHandle` for authoring, `EntityHandle` for runtime) so mixing is a compile error in C++ and a tagged value across the C ABI; cross-layer references use UUID. Not implemented yet.
+## Former risk, now resolved (M05-T02b)
+A plain `Handle` did not name its container, so a handle from one scene could silently resolve against a copy of it (for example a Play clone). Handles are now **domain-typed**: `BasicHandle<Tag>`, with `ObjectHandle` for the authoring scene. `SlotMap<T, H>` only accepts its own handle type; passing another domain's handle (or the untyped `Handle`) to `Scene` or a typed `SlotMap` is a **compile error**, proven by `static_assert`s in `test_handle.cpp` and a compile-fail check. Remaining limitation: two *instances* of the same domain (two `Scene`s) still share a handle type; a cloned scene's handles are numerically valid in the original. Code that holds handles across scenes must use UUIDs. A runtime handle type will be added with the Runtime World (M1).
 
 ## Consequences
 All cross-language wrappers hold handles, never object memory (ADR-0007). Registry lifetime/shutdown order must be explicit when the Runtime exists.

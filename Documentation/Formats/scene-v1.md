@@ -35,8 +35,10 @@ Status: **implemented and unit-tested**: in-memory (`SceneSerializer.*`) and fil
 | `objects[].parent` | string \| null | no | UUID of another object in the file; absent/null = root. |
 | `objects[].transform` | object | no | Absent = identity. |
 | `transform.position` | [x,y,z] numbers | no | Default `[0,0,0]`. |
-| `transform.rotation_euler_deg` | [x,y,z] numbers | no | Degrees. Default `[0,0,0]`. Euler order is not yet normative (defined with the viewport/gizmo task). |
+| `transform.rotation_euler_deg` | [x,y,z] numbers | no | Degrees. Default `[0,0,0]`. **Normative:** rotation matrix `R = Ry * Rx * Rz` (Z applied first), right-handed, counter-clockwise positive. See ADR-0010. |
 | `transform.scale` | [x,y,z] numbers | no | Default `[1,1,1]`. |
+
+Transforms are **local**: relative to the parent object (`world = parent_world * T*R*S`). Roots are relative to the world origin. Right-handed, +Y up (ADR-0010). Primitive sizes: cube edge 1, sphere radius 0.5, plane 1×1 in XZ; scale comes from the transform.
 
 Sibling order: children of a parent keep the relative order in which they appear in `objects`; root order likewise.
 

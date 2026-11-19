@@ -5,8 +5,8 @@ Describes code that EXISTS. Planned parts are labelled **(planned)**. Decisions:
 ## Layers
 ```
 Tools/CLI  (k)  ─┐
-Tests/*          ├──►  Engine/*  (C++20, no Qt, no third-party deps)
-Editor/ (planned, Qt, Editor-only) ─┘
+Tests/*          ├──►  Engine/*  (C++20, no Qt, no third-party deps, portable)
+Editor/Spike (Windows: Qt Widgets + Direct3D 11, UNVERIFIED) ─┘
 ```
 
 ## Modules that exist
@@ -16,18 +16,21 @@ Editor/ (planned, Qt, Editor-only) ─┘
 | Identity | `Engine/Identity` | `Uuid` (persistent identity), `Handle` + `SlotMap<T>` (generational runtime references). ADR-0003 |
 | Scene | `Engine/Scene` | **Authoring** `Scene`: objects with UUID, name, kind (empty/cube/sphere/plane), Euler transform, ordered hierarchy. Create/destroy (subtree)/reparent (cycle-safe)/rename/set transform. Not thread-safe |
 | Serialization | `Engine/Serialization` | Strict `Json`; `SceneSerializer` (scene ⇄ JSON, format `kengine.scene` v1); `SceneFile` (atomic save with backup, bounded load; POSIX-verified). ADR-0006 |
+| Math | `Engine/Math` | `Vec3`, row-major `Mat4` (TRS, Euler `Ry*Rx*Rz`, look-at, D3D-style perspective, inverse). ADR-0010 |
+| Scene transforms | `Engine/Scene/SceneTransforms` | local/world matrices (iterative, any depth) |
+| Rendering (API-neutral) | `Engine/Rendering` | primitive meshes, `OrbitCamera` (+screen rays), CPU `pick`, `DrawList` (the only thing a renderer consumes). No graphics API, no Qt |
 | CLI | `Tools/CLI` | `k --version`, `k --help`, `k doctor [--json]` (build facts + engine self-checks) |
 
 ## Invariants enforced by code and tests
 - UUIDs are unique per scene and never nil; handles never resolve after destroy/slot reuse; generation exhaustion retires a slot.
 - Mutating APIs return `Status`/`Result` with stable codes; invalid handles are errors, not UB.
-- Scene files never contain handles; loading validates schema, version, UUIDs, parents and cycles.
+- Handles are domain-typed: mixing domains is a compile error. Scene files never contain handles; loading validates schema, version, UUIDs, parents and cycles.
 - Deep hierarchies do not recurse on the call stack (iterative traversal/destroy; tested at depth 100,000).
 
 ## Planned (not implemented)
 - Runtime `World`/ECS, scheduler, Play isolation, headless stepping (M1; ADR-0001).
-- Qt Editor shell, viewport/renderer, Undo/Redo commands, project creation (M0.5; ADR-0004/0005).
+- Qt Editor shell (docks, inspector, explorer), Undo/Redo commands, project creation (M0.5). A Direct3D 11 viewport *spike* exists but is unverified (ADR-0004/0005).
 - Reflection/Inspector metadata (ADR-0002); C ABI, Python/C++/Rust bindings (ADR-0007); assets, build/export, simulation (M3–M6).
 
 ## Known architectural risks
-See ADR-0003 ("handles don't name their container") and ADR-0004 (renderer unverified).
+ADR-0003: two instances of the same handle domain still share a handle type (use UUIDs across scenes). ADR-0004: the Direct3D 11 / Qt code has never been compiled or run.
