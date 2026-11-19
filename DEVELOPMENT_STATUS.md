@@ -1,6 +1,6 @@
 # Development status (handoff)
 
-**Date:** 2026-11-19 · **Milestone:** M0 in progress, M0.5 engine-side done through viewport support; Editor/viewport awaiting owner verification · **Branch:** `main`
+**Date:** 2026-11-19 · **Milestone:** M0 in progress; M0.5 engine side essentially complete (identity, scene, files, rendering support, undo/redo, Play isolation, CLI); Editor shell and viewport awaiting owner verification · **Branch:** `main`
 
 ## Summary
 New project (no pre-existing repository). Session 1 established the control documents, ADRs, a verified build/test route, a minimal CLI, and the first M0.5 engine slice (identity, authoring scene, strict JSON, scene serialization). Session 2 added scene **file** save/load (atomic, with backup and bounded, validated load). The Qt Editor, renderer and everything GUI-related remains **blocked by the environment**, not started.
@@ -19,6 +19,17 @@ New project (no pre-existing repository). Session 1 established the control docu
 | Profilers | not investigated |
 
 Consequence: CMake/Qt/Rust/GPU work cannot be built or verified here. Work that does not need them proceeded.
+
+## Session 4 (2026-11-19): editing model, isolated Play, CLI scene tools
+**Owner decisions:** license deferred (no LICENSE file); supported platforms Windows 10 and 11 x64 (recorded in AGENTS.md, README, ADR-0004/0005).
+**Done and verified on Linux (unit + CLI tests, ASan+UBSan, Release):**
+- `Scene`: sibling-indexed insertion/reordering (`create_with_uuid`/`reparent` index, `sibling_index`), needed to undo deletes at the exact old position.
+- `Engine/Editing` (ADR-0011): `Command`, `CommandHistory` (undo/redo, merge of drags, clean/dirty tracking, depth trimming), UUID-addressed commands (create, delete subtree, set-transform, rename, reparent), `SceneEditor` (document model: edits, save/open, isolated Play). M05-T06 and M05-T07 engine sides.
+- CLI `k scene validate <file> [--json]` and `k scene dump <file> [--json]` (M05-T08 partial). Text output escapes control characters from file content.
+- Tests: 22 new unit cases (incl. a 1,500-step randomized undo/redo model check against serialized snapshots, 500 repeated Play sessions) and 11 new CLI cases.
+**Mutation checks (throw-away copy / restored in repo):** 14 editing mutations: 13 caught at once (e.g. delete-undo not restoring sibling index, snapshot omitting descendants, redo branch kept, save while playing writing the play copy, undo allowed while playing). **One survived (H7)**: investigation showed the guarded branch was unreachable through the public API (`mark_clean()` always closes the merge run), so I deleted the dead code and replaced the misleading test with one that checks the real property. 3 CLI mutations (unescaped names, invalid scene exits 0, flat dump) all caught.
+**Own mistakes fixed along the way:** a confused test (second `redo()` with nothing to redo); a randomized test mix (70% edits) that failed its own coverage guard, rebalanced instead of weakening the guard; a `/bin/sh` vs bash syntax slip in a helper script (nothing ran, redone).
+**Not done / limits:** no Editor UI, no runtime loop (Play only isolates a scene copy), no composite commands (duplicate/paste), property edits limited to name and transform, CLI has no structured log file and no screenshot probe.
 
 ## Session 3 (2026-11-19): target hardware = Direct3D 10.1 (Intel Core i5-560M)
 **New fact from the owner:** development machine has Qt 6 + CMake (Windows assumed) and an Intel Core i5-560M; the app must support DX 10.1. This invalidated the earlier ADR-0004 proposal (OpenGL 3.3 core), because that iGPU is believed (UNVERIFIED) to offer only OpenGL 2.1.
@@ -46,12 +57,12 @@ Consequence: CMake/Qt/Rust/GPU work cannot be built or verified here. Work that 
 - Control docs: AGENTS.md, README, ARCHITECTURE, ROADMAP, FEATURE_MATRIX, BUILDING, TESTING, TASKS.json, Documentation/Formats/scene-v1.md.
 
 ## Verification (exact commands, Ubuntu 24.04 / GCC 13.3.0)
-Latest run (end of session 3), each from a **clean tree** (`make clean` first), compiled with `-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror` (zero warnings):
+Latest run, each from a **clean tree** (`make clean` first), compiled with `-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror` (zero warnings):
 | Command | Result |
 |---|---|
-| `make STRICT=1 check` | exit 0; unit `passed=103 failed=0 not_run=0`; CLI `Ran 10 tests ... OK` |
-| `make SANITIZE=1 STRICT=1 check` | exit 0; unit 103/0/0; CLI 10 OK; no ASan/UBSan reports |
-| `make BUILD_TYPE=Release STRICT=1 check` | exit 0; unit 103/0/0; CLI 10 OK |
+| `make STRICT=1 check` | exit 0; unit `passed=126 failed=0 not_run=0`; CLI `Ran 21 tests ... OK` |
+| `make SANITIZE=1 STRICT=1 check` | exit 0; unit 126/0/0; CLI 21 OK; no ASan/UBSan/LSan reports |
+| `make BUILD_TYPE=Release STRICT=1 check` | exit 0; unit 126/0/0; CLI 21 OK |
 Nothing in `Editor/` is part of these runs (it is only built with `-DKENGINE_BUILD_EDITOR_SPIKE=ON` on Windows).
 
 Earlier run (end of session 2):
@@ -90,6 +101,8 @@ CMake configure/build/ctest (no cmake); any Qt/GUI/viewport/screenshot test; int
 3. Is a non-Windows Editor/viewport ever required? (It would need a second renderer backend behind `DrawList`.)
 
 ## Next task (exact)
-**M05-T03b (owner action): run the spike on the i5-560M machine.** Follow `Editor/Spike/README.md` Steps 0–3 and send back: `ctest` output (this is also the first real run of `CMakeLists.txt`), the full `k_gpu_probe` output, the viewport console output/exit codes (including `--screenshot out.png --no-warp`), `out.png`, and Windows/driver/Qt/compiler versions. Expect possible small compile fixes in the Windows-only files; send the compiler output.
-Why this first: ADR-0004 rests on unverified hardware facts and the renderer has never run; building the Editor shell (M05-T01) on top of it would compound unknowns.
-**If the owner cannot run it yet (Qt-free work that can continue meanwhile):** M05-T06 engine part (command history for create/delete/rename/transform with undo/redo, built on `Scene`), then M05-T07 engine part (isolated Play via scene copy), then M05-T08 (CLI `scene validate/dump`, now unblocked).
+**Still M05-T03b (owner action): run the spike on the i5-560M machine** (Windows 10/11). Follow `Editor/Spike/README.md` Steps 0-3 and send back: `ctest` output (also the first real run of `CMakeLists.txt`), the full `k_gpu_probe` output, the viewport output/exit codes (including `--screenshot out.png --no-warp`), `out.png`, and Windows build / GPU driver / Qt kit / compiler versions. Expect possible small compile fixes in the Windows-only files; paste compiler output verbatim.
+Why it is still first: the Editor shell (M05-T01) and viewport integration (M05-T03/T04) would be built on a renderer that has never run, with ADR-0004 resting on unverified hardware facts. The Qt-free engine side of M0.5 is now complete, so there is little left that can be done safely without that evidence.
+
+**What I can still do without the owner's machine (smaller value):** M05-T08 remainder (structured log file option; project-level validation once a manifest exists), composite commands (duplicate/paste) on top of `CommandHistory`, a project manifest + `k create` skeleton (needs the ADR-0006 manifest decision: JSON vs TOML), fuzzing the JSON/scene parser. Say which, or send the spike results.
+**After the spike passes:** M05-T01 (Qt Widgets shell: Explorer, Inspector, Console, Viewport docks) wired to `SceneEditor`, then M05-T04 (selection + transform editing UI), then M05-T09 (Hello Cube acceptance run).

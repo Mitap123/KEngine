@@ -24,7 +24,8 @@ Statuses: PLANNED, PROTOTYPE, IMPLEMENTED, TESTED, STABLE, BLOCKED. Each status 
 | Qt Editor shell (docks, explorer, inspector) | BLOCKED | needs the owner's Windows/Qt machine; not started |
 | Viewport verified on the target GPU (i5-560M iGPU, D3D 10.1) | BLOCKED | waiting for the owner to run `k_gpu_probe` / `k_viewport_spike` |
 | Selection sync, transform editing UI | BLOCKED | depends on Editor shell |
-| Undo/Redo command history | PLANNED | engine-side core can proceed without Qt |
-| Play/Stop isolation | PLANNED | engine-side core can proceed without Qt; ADR-0003 handle-domain risk to address first |
-| CLI scene validate / tree dump | PLANNED | M05-T08 |
+| Undo/redo for create/delete(subtree)/transform/rename/reparent, merge of drags, dirty tracking (`SceneEditor`, Qt-free) | TESTED | `test_commands.cpp` incl. randomized snapshot-model check; 14+ mutation checks. No UI yet |
+| Play/Stop isolation (value copy of the authoring scene; edits/undo blocked while playing) | TESTED | `test_commands.cpp` (`play_*`, 500 repeated sessions). Engine-side only: no runtime loop, no Editor buttons yet |
+| CLI `k scene validate <file>` and `k scene dump <file> [--json]` (stable error codes, exit codes, escaped terminal output) | TESTED | `Tests/CLI/test_cli.py`; 3 CLI mutation checks |
+| CLI screenshot / visual probe | BLOCKED | needs the verified Direct3D path (M05-T03b) |
 | Runtime World/ECS, scripting, assets, export, native SDKs, simulation | PLANNED | later milestones |

@@ -19,7 +19,8 @@ Editor/Spike (Windows: Qt Widgets + Direct3D 11, UNVERIFIED) ─┘
 | Math | `Engine/Math` | `Vec3`, row-major `Mat4` (TRS, Euler `Ry*Rx*Rz`, look-at, D3D-style perspective, inverse). ADR-0010 |
 | Scene transforms | `Engine/Scene/SceneTransforms` | local/world matrices (iterative, any depth) |
 | Rendering (API-neutral) | `Engine/Rendering` | primitive meshes, `OrbitCamera` (+screen rays), CPU `pick`, `DrawList` (the only thing a renderer consumes). No graphics API, no Qt |
-| CLI | `Tools/CLI` | `k --version`, `k --help`, `k doctor [--json]` (build facts + engine self-checks) |
+| Editing | `Engine/Editing` | `Command`/`CommandHistory` (undo/redo, merge, dirty tracking), UUID-addressed scene commands, `SceneEditor` (document model: edits, save/open, isolated Play). The Editor UI talks only to this. ADR-0011 |
+| CLI | `Tools/CLI` | `k --version`, `k --help`, `k doctor [--json]` (build facts + engine self-checks), `k scene validate|dump <file> [--json]` |
 
 ## Invariants enforced by code and tests
 - UUIDs are unique per scene and never nil; handles never resolve after destroy/slot reuse; generation exhaustion retires a slot.
@@ -28,8 +29,8 @@ Editor/Spike (Windows: Qt Widgets + Direct3D 11, UNVERIFIED) ─┘
 - Deep hierarchies do not recurse on the call stack (iterative traversal/destroy; tested at depth 100,000).
 
 ## Planned (not implemented)
-- Runtime `World`/ECS, scheduler, Play isolation, headless stepping (M1; ADR-0001).
-- Qt Editor shell (docks, inspector, explorer), Undo/Redo commands, project creation (M0.5). A Direct3D 11 viewport *spike* exists but is unverified (ADR-0004/0005).
+- Runtime `World`/ECS, scheduler, headless stepping (M1; ADR-0001). (Play isolation of the authoring scene already exists: ADR-0011.)
+- Qt Editor shell (docks, inspector, explorer) on top of `SceneEditor`, project creation (M0.5). A Direct3D 11 viewport *spike* exists but is unverified (ADR-0004/0005).
 - Reflection/Inspector metadata (ADR-0002); C ABI, Python/C++/Rust bindings (ADR-0007); assets, build/export, simulation (M3–M6).
 
 ## Known architectural risks

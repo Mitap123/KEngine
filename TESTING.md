@@ -5,8 +5,8 @@ Reports must distinguish **passed / failed / skipped / not-run**. The unit runne
 ## Layers that exist
 | Layer | Location | Command | What it covers |
 |---|---|---|---|
-| Unit | `Tests/Unit/*.cpp` (in-repo `KTEST` harness) | `make test` | UUID, handles/SlotMap (+ typed-handle compile-time checks), Scene, JSON, scene serialization, scene file I/O, math, world transforms, primitive meshes, orbit camera, picking, draw list (temp dirs under the system temp path, removed after each test) |
-| CLI | `Tests/CLI/test_cli.py` (Python `unittest`) | `make cli-test` | `k --version`, `--help`, `doctor` (+`--json`), usage errors, exit codes |
+| Unit | `Tests/Unit/*.cpp` (in-repo `KTEST` harness) | `make test` | UUID, handles/SlotMap (+ typed-handle compile-time checks), Scene, JSON, scene serialization, scene file I/O, math, world transforms, primitive meshes, orbit camera, picking, draw list, command history/undo-redo, SceneEditor, Play isolation (temp dirs under the system temp path, removed after each test) |
+| CLI | `Tests/CLI/test_cli.py` (Python `unittest`) | `make cli-test` | `k --version`, `--help`, `doctor` (+`--json`), `scene validate`/`dump` (valid, invalid, hostile, deep files), usage errors, exit codes |
 | Sanitizers | same tests | `make SANITIZE=1 check` | ASan + UBSan on all of the above |
 
 Filter unit cases: `Build/make-debug/k_unit_tests <substring>`; list: `--list`.
@@ -32,3 +32,8 @@ See `DEVELOPMENT_STATUS.md` ("Verification") for exact command output summaries 
 - Picking and camera tests compare against hand-computed distances (e.g. rotated and non-uniformly scaled cubes, children of scaled/rotated parents) and round-trip projected points through `screen_ray`.
 - **Not tested:** anything that draws pixels. `Editor/Spike` (Direct3D 11, Qt) has never been compiled or run. Its syntax was checked only against hand-written stub headers (this catches typos/type errors, not API misuse).
 - The test runner now converts an uncaught exception into a reported failure instead of aborting.
+
+## Notes on editing-model tests
+- Undo/redo is verified by comparing the *serialized scene text* (UUIDs, names, kinds, transforms, hierarchy, sibling order) with a reference after every step, including a randomized run (fixed seed, 1,500 steps, 40% edit / 30% undo / 30% redo) that also asserts it exercised enough edits, rejected edits, undos and redos to be meaningful. The first version of that mix (70% edits) failed its own coverage guard; the mix was rebalanced rather than the threshold lowered.
+- One mutation (merge-into-saved-step stays clean) survived; analysis showed the guarded branch was unreachable through the public API, so the dead code and its misleading test were removed instead of testing around them.
+- A scene-file/CLI test with a hostile name (newline, ESC, BEL) asserts the text output cannot be forged.

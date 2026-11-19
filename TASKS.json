@@ -450,10 +450,11 @@
         {
           "id": "M05-T06",
           "title": "Implement Command Pattern Undo/Redo for core edits",
-          "status": "pending",
+          "status": "partial",
           "priority": "P0",
           "depends_on": [
-            "M05-T04"
+            "M05-T02",
+            "M05-T05"
           ],
           "scope": [
             "Editor/Actions",
@@ -468,15 +469,24 @@
           "verification_plan": [
             "Integration tests for create/delete/transform undo-redo"
           ],
-          "verification_commands": [],
+          "verification_commands": [
+            "make STRICT=1 test",
+            "make SANITIZE=1 STRICT=1 test"
+          ],
           "out_of_scope": [
             "Undo for every future asset and graph operation"
-          ]
+          ],
+          "evidence": [
+            "Engine/Editing/*",
+            "Tests/Unit/test_commands.cpp",
+            "Documentation/ADR/0011-editing-model-commands-history-play.md"
+          ],
+          "notes": "Engine side done and tested (create/delete subtree/transform/rename/reparent, merge, dirty tracking, no dangling handles because commands use UUIDs). Remaining: wiring into the Editor UI (menu/shortcuts, selection by UUID, gesture end on mouse release) - depends on M05-T01/T04."
         },
         {
           "id": "M05-T07",
           "title": "Implement minimal isolated Play/Stop",
-          "status": "pending",
+          "status": "partial",
           "priority": "P0",
           "depends_on": [
             "M05-T05",
@@ -497,15 +507,23 @@
           "verification_plan": [
             "Integration test creates runtime-only changes and verifies source scene remains unchanged after Stop"
           ],
-          "verification_commands": [],
+          "verification_commands": [
+            "make STRICT=1 test",
+            "make SANITIZE=1 STRICT=1 test"
+          ],
           "out_of_scope": [
             "Gameplay scripts, physics and full standalone runtime"
-          ]
+          ],
+          "evidence": [
+            "Engine/Editing/SceneEditor.*",
+            "Tests/Unit/test_commands.cpp (play_*)"
+          ],
+          "notes": "Engine side done: Play = independent value copy; runtime edits never touch the authoring scene; Stop discards; 500 repeated sessions tested; edits/undo refused while playing. No runtime loop exists yet (M1) and no Editor Play/Stop buttons. Handles are identical in source and copy: use UUIDs (ADR-0003)."
         },
         {
           "id": "M05-T08",
           "title": "Add CLI scene validation, state dump and visual probe",
-          "status": "pending",
+          "status": "partial",
           "priority": "P1",
           "depends_on": [
             "M05-T05",
@@ -526,10 +544,17 @@
           "verification_plan": [
             "Automated test invokes the command, checks JSON, exit code and optional PNG artifact"
           ],
-          "verification_commands": [],
+          "verification_commands": [
+            "make STRICT=1 cli-test"
+          ],
           "out_of_scope": [
             "General-purpose remote IPC server"
-          ]
+          ],
+          "evidence": [
+            "Tools/CLI/main.cpp",
+            "Tests/CLI/test_cli.py"
+          ],
+          "notes": "Done: `k scene validate` and `k scene dump [--json]` (stable codes, exit 1 on invalid, machine-readable JSON, escaped terminal output). Not done: structured log file output and the screenshot/visual probe (blocked on the verified Direct3D path, M05-T03b); no project-level (not just scene) validation yet."
         },
         {
           "id": "M05-T09",
