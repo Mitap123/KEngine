@@ -47,7 +47,7 @@ Result<ObjectHandle> Scene::create(ObjectKind kind, std::string name, ObjectHand
 }
 
 Result<ObjectHandle> Scene::create_with_uuid(const Uuid& id, ObjectKind kind, std::string name,
-                                       ObjectHandle parent) {
+                                             ObjectHandle parent, std::size_t sibling_index) {
     if (id.is_nil()) {
         return make_error("scene.nil_uuid", "an object cannot have the nil UUID");
     }
@@ -66,12 +66,18 @@ Result<ObjectHandle> Scene::create_with_uuid(const Uuid& id, ObjectKind kind, st
     obj.parent = parent;
     const ObjectHandle h = objects_.insert(std::move(obj));  // may reallocate: fetch parent AFTER this
     by_uuid_.emplace(id, h);
-    if (parent.is_null()) {
-        roots_.push_back(h);
-    } else {
-        objects_.get(parent)->children.push_back(h);
-    }
+    std::vector<ObjectHandle>& siblings = parent.is_null() ? roots_ : objects_.get(parent)->children;
+    siblings.insert(siblings.begin() + static_cast<std::ptrdiff_t>(std::min(sibling_index, siblings.size())), h);
     return h;
+}
+
+std::optional<std::size_t> Scene::sibling_index(ObjectHandle h) const {
+    const SceneObject* o = objects_.get(h);
+    if (!o) return std::nullopt;
+    const std::vector<ObjectHandle>& siblings = o->parent.is_null() ? roots_ : objects_.get(o->parent)->children;
+    const auto it = std::find(siblings.begin(), siblings.end(), h);
+    if (it == siblings.end()) return std::nullopt;  // cannot happen while the invariants hold
+    return static_cast<std::size_t>(it - siblings.begin());
 }
 
 void Scene::detach_from_parent(ObjectHandle h, const SceneObject& o) {
@@ -103,7 +109,7 @@ Status Scene::destroy(ObjectHandle h) {
     return Status::success();
 }
 
-Status Scene::reparent(ObjectHandle h, ObjectHandle new_parent) {
+Status Scene::reparent(ObjectHandle h, ObjectHandle new_parent, std::size_t sibling_index) {
     if (const HandleStatus st = objects_.status(h); st != HandleStatus::Valid) return invalid_handle(h, st);
     if (!new_parent.is_null()) {
         if (const HandleStatus st = objects_.status(new_parent); st != HandleStatus::Valid) {
@@ -119,11 +125,8 @@ Status Scene::reparent(ObjectHandle h, ObjectHandle new_parent) {
     SceneObject* o = objects_.get(h);
     detach_from_parent(h, *o);
     o->parent = new_parent;
-    if (new_parent.is_null()) {
-        roots_.push_back(h);
-    } else {
-        objects_.get(new_parent)->children.push_back(h);
-    }
+    std::vector<ObjectHandle>& siblings = new_parent.is_null() ? roots_ : objects_.get(new_parent)->children;
+    siblings.insert(siblings.begin() + static_cast<std::ptrdiff_t>(std::min(sibling_index, siblings.size())), h);
     return Status::success();
 }
 

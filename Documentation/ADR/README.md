@@ -16,3 +16,4 @@ Process: any decision that changes public API, serialization, ownership, thread 
 | [0008](0008-determinism-scope.md) | Determinism requirements and limits | accepted (scope statement) |
 | [0009](0009-bootstrap-build-route.md) | Bootstrap Makefile alongside CMake | accepted |
 | [0010](0010-math-and-coordinate-conventions.md) | Math and coordinate conventions | accepted, implemented, tested |
+| [0011](0011-editing-model-commands-history-play.md) | Editing model: commands, history, dirty tracking, isolated Play | accepted, implemented, tested |

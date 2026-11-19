@@ -4,13 +4,18 @@
 //   k --version
 //   k --help | -h | help
 //   k doctor [--json]
+//   k scene validate <file> [--json]
+//   k scene dump <file> [--json]
 //
 // Exit codes: 0 success; 1 a command ran and reported failure (doctor check
-// failed); 2 usage error (unknown command/flag). Results go to stdout,
-// diagnostics about misuse go to stderr.
+// failed, scene file invalid); 2 usage error (unknown command/flag). Results go
+// to stdout, error and warning diagnostics go to stderr (with --json, scene
+// errors are reported as JSON on stdout instead).
+#include <charconv>
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "Engine/Core/Version.h"
@@ -18,6 +23,7 @@
 #include "Engine/Identity/Uuid.h"
 #include "Engine/Scene/Scene.h"
 #include "Engine/Serialization/Json.h"
+#include "Engine/Serialization/SceneFile.h"
 #include "Engine/Serialization/SceneSerializer.h"
 
 namespace {
@@ -33,6 +39,8 @@ void print_usage(std::FILE* out) {
         "usage:\n"
         "  k --version        print the version\n"
         "  k doctor [--json]  report build/platform facts and run engine self-checks\n"
+        "  k scene validate <file> [--json]  check a scene file; exit 1 if it is invalid\n"
+        "  k scene dump <file> [--json]      print the scene tree (or canonical JSON)\n"
         "  k --help           show this help\n"
         "\n"
         "exit codes: 0 ok, 1 command failed, 2 usage error\n",
@@ -212,6 +220,132 @@ int run_doctor(bool json) {
     return all_ok ? kExitOk : kExitFailure;
 }
 
+
+// ----------------------------------------------------------------- scene ---
+
+// Scene files may legally contain control characters in names (and error
+// messages quote file content). Printing them raw would let a file forge
+// output lines or inject terminal escape sequences, so text output escapes them.
+std::string printable(const std::string& in) {
+    std::string out;
+    out.reserve(in.size());
+    for (const char ch : in) {
+        const auto c = static_cast<unsigned char>(ch);
+        if (c == '\n') out += "\\n";
+        else if (c == '\r') out += "\\r";
+        else if (c == '\t') out += "\\t";
+        else if (c < 0x20 || c == 0x7F) {
+            static const char kHex[] = "0123456789abcdef";
+            out += "\\x";
+            out.push_back(kHex[c >> 4]);
+            out.push_back(kHex[c & 0x0F]);
+        } else {
+            out.push_back(ch);
+        }
+    }
+    return out;
+}
+
+std::string number_text(double d) {
+    char buf[64];
+    const auto r = std::to_chars(buf, buf + sizeof buf, d);  // shortest round-trip form
+    return std::string(buf, r.ptr);
+}
+
+std::string vec_text(const k::Vec3& v) {
+    return "(" + number_text(v[0]) + ", " + number_text(v[1]) + ", " + number_text(v[2]) + ")";
+}
+
+int report_scene_error(const k::Error& e, bool json) {
+    if (json) {
+        k::Json err = k::Json::object();
+        err.set("code", k::Json::string(e.code));
+        err.set("message", k::Json::string(e.message));
+        k::Json root = k::Json::object();
+        root.set("ok", k::Json::boolean(false));
+        root.set("error", std::move(err));
+        auto text = root.dump(2);
+        std::fputs(text ? text.value().c_str() : "{\"ok\":false}\n", stdout);
+    } else {
+        std::fprintf(stderr, "error[%s]: %s\n", e.code.c_str(), printable(e.message).c_str());
+    }
+    return kExitFailure;
+}
+
+int run_scene(int argc, char** argv) {
+    if (argc < 3) {
+        std::fputs("k: scene: missing subcommand (validate | dump)\n", stderr);
+        return kExitUsage;
+    }
+    const std::string sub = argv[2];
+    if (sub != "validate" && sub != "dump") {
+        std::fprintf(stderr, "k: scene: unknown subcommand '%s' (validate | dump)\n", sub.c_str());
+        return kExitUsage;
+    }
+    std::string file;
+    bool json = false;
+    for (int i = 3; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--json") == 0) {
+            json = true;
+        } else if (argv[i][0] == '-' && argv[i][1] != '\0') {
+            std::fprintf(stderr, "k: scene %s: unknown option '%s'\n", sub.c_str(), argv[i]);
+            return kExitUsage;
+        } else if (file.empty()) {
+            file = argv[i];
+        } else {
+            std::fprintf(stderr, "k: scene %s: unexpected extra argument '%s'\n", sub.c_str(), argv[i]);
+            return kExitUsage;
+        }
+    }
+    if (file.empty()) {
+        std::fprintf(stderr, "k: scene %s: missing <file>\n", sub.c_str());
+        return kExitUsage;
+    }
+
+    auto loaded = k::load_scene_file(file);
+    if (!loaded) return report_scene_error(loaded.error(), json);
+    const k::Scene& scene = loaded.value().scene;
+    const auto& warnings = loaded.value().warnings;
+
+    if (sub == "validate") {
+        if (json) {
+            k::Json root = k::Json::object();
+            root.set("ok", k::Json::boolean(true));
+            root.set("objects", k::Json::number(static_cast<double>(scene.object_count())));
+            k::Json w = k::Json::array();
+            for (const auto& msg : warnings) w.push_back(k::Json::string(msg));
+            root.set("warnings", std::move(w));
+            std::fputs(root.dump(2).value().c_str(), stdout);
+        } else {
+            for (const auto& msg : warnings) std::fprintf(stderr, "warning: %s\n", printable(msg).c_str());
+            std::printf("OK: %s: %zu objects, %zu warnings\n", printable(file).c_str(), scene.object_count(), warnings.size());
+        }
+        return kExitOk;
+    }
+
+    // dump
+    for (const auto& msg : warnings) {
+        if (!json) std::fprintf(stderr, "warning: %s\n", printable(msg).c_str());
+    }
+    if (json) {
+        // Canonical form: exactly what a save would write (not the input bytes).
+        auto text = k::save_scene_to_string(scene);
+        if (!text) return report_scene_error(text.error(), true);
+        std::fputs(text.value().c_str(), stdout);
+        return kExitOk;
+    }
+    std::printf("scene: %zu objects (%s v%d)\n", scene.object_count(), k::kSceneSchemaName, k::kSceneSchemaVersion);
+    std::unordered_map<std::uint32_t, std::size_t> depth;  // handle slot -> depth; preorder visits parents first
+    scene.visit_preorder([&](k::ObjectHandle h, const k::SceneObject& o) {
+        const std::size_t d = o.parent.is_null() ? 0 : depth.at(o.parent.index) + 1;
+        depth.emplace(h.index, d);
+        std::printf("%s%s [%s] %s  pos=%s rot=%s scale=%s\n", std::string(d * 2, ' ').c_str(), printable(o.name).c_str(),
+                    k::to_string(o.kind), o.id.to_string().c_str(), vec_text(o.transform.position).c_str(),
+                    vec_text(o.transform.rotation_euler_deg).c_str(), vec_text(o.transform.scale).c_str());
+    });
+    return kExitOk;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -242,6 +376,8 @@ int main(int argc, char** argv) {
         }
         return run_doctor(json);
     }
+
+    if (cmd == "scene") return run_scene(argc, argv);
 
     std::fprintf(stderr, "k: unknown command '%s' (try 'k --help')\n", cmd.c_str());
     return kExitUsage;

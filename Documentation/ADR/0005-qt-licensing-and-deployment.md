@@ -1,6 +1,6 @@
 # ADR-0005: Qt licensing and deployment
 
-- **Status:** proposed — **needs a decision from the project owner** (license of K Engine itself is undecided).
+- **Status:** proposed. The owner has **deferred** the license decision for K Engine itself (2026-11-19: "not needed for now"); it blocks nothing until binaries are distributed. Re-open this ADR before the first distribution.
 - **Date:** 2026-11-18
 
 ## Context
@@ -26,7 +26,7 @@ Option 1 by default: restrict the Editor to a minimal, documented module set (Co
 - Any module beyond the approved set needs a license check first.
 - Deployment (installers/bundles with the Qt libraries) is a task for M4 and requires a license compliance checklist.
 
-## Open questions for the owner
+## Open questions for the owner (deferred, not blocking development)
 1. Which license will K Engine itself use (affects compatibility with LGPL/GPL components)?
 2. Is a commercial Qt license an option?
 3. Is the Editor intended to be redistributed as binaries?

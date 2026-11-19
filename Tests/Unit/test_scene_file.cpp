@@ -8,35 +8,13 @@
 
 #include "Engine/Scene/Scene.h"
 #include "Engine/Serialization/SceneFile.h"
+#include "Tests/Unit/TempDir.h"
 #include "Tests/Unit/TestFramework.h"
 
 using namespace k;
 namespace fs = std::filesystem;
 
 namespace {
-
-// Unique scratch directory, removed on scope exit.
-class TempDir {
-public:
-    TempDir() : path_(fs::temp_directory_path() / ("kengine_test_" + Uuid::generate().to_string())) {
-        fs::create_directories(path_);
-    }
-    ~TempDir() { std::error_code ec; fs::remove_all(path_, ec); }
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-    const fs::path& path() const { return path_; }
-    fs::path operator/(const std::string& name) const { return path_ / name; }
-
-    std::vector<std::string> listing() const {
-        std::vector<std::string> names;
-        for (const auto& e : fs::directory_iterator(path_)) names.push_back(e.path().filename().string());
-        std::sort(names.begin(), names.end());
-        return names;
-    }
-
-private:
-    fs::path path_;
-};
 
 std::string slurp(const fs::path& p) {
     std::ifstream in(p, std::ios::binary);
@@ -72,7 +50,7 @@ std::string code_of(const Result<T>& r) { return r.ok() ? std::string() : r.erro
 }  // namespace
 
 KTEST(scene_file_round_trip_preserves_state_and_leaves_no_extra_files) {
-    TempDir dir;
+    ktest::TempDir dir;
     const Scene s = sample_scene();
     KCHECK(save_scene_file(s, dir / "a.kscene").ok());
     KCHECK(dir.listing() == std::vector<std::string>{"a.kscene"});  // no temp, no backup on first save
@@ -88,7 +66,7 @@ KTEST(scene_file_round_trip_preserves_state_and_leaves_no_extra_files) {
 }
 
 KTEST(scene_file_second_save_keeps_previous_version_as_backup) {
-    TempDir dir;
+    ktest::TempDir dir;
     const Scene a = sample_scene("A");
     const Scene b = sample_scene("B");
     KCHECK(save_scene_file(a, dir / "s.kscene").ok());
@@ -103,7 +81,7 @@ KTEST(scene_file_second_save_keeps_previous_version_as_backup) {
 }
 
 KTEST(scene_file_keep_backup_false_creates_no_backup) {
-    TempDir dir;
+    ktest::TempDir dir;
     SaveOptions opt;
     opt.keep_backup = false;
     KCHECK(save_scene_file(sample_scene("A"), dir / "s.kscene", opt).ok());
@@ -123,7 +101,7 @@ KTEST(scene_file_failure_at_any_stage_leaves_existing_file_untouched) {
         {"rename", "file.rename_failed"},
     };
     for (const Case& c : cases) {
-        TempDir dir;
+        ktest::TempDir dir;
         const fs::path target = dir / "s.kscene";
         KCHECK(save_scene_file(sample_scene("OLD"), target).ok());
         const std::string before = slurp(target);
@@ -148,7 +126,7 @@ KTEST(scene_file_failure_at_any_stage_leaves_existing_file_untouched) {
 
 KTEST(scene_file_failed_first_save_creates_nothing) {
     for (const char* stage : {"create_temp", "write", "sync", "rename"}) {
-        TempDir dir;
+        ktest::TempDir dir;
         SaveOptions opt;
         opt.fault_injection = [&](std::string_view s) { return s == stage; };
         KCHECK(!save_scene_file(sample_scene(), dir / "new.kscene", opt).ok());
@@ -157,14 +135,14 @@ KTEST(scene_file_failed_first_save_creates_nothing) {
 }
 
 KTEST(scene_file_save_into_missing_directory_fails_cleanly) {
-    TempDir dir;
+    ktest::TempDir dir;
     const Status st = save_scene_file(sample_scene(), dir / "no_such_dir" / "s.kscene");
     KCHECK_EQ(code_of(st), std::string("file.temp_create_failed"));
     KCHECK(dir.listing().empty());  // does not create directories implicitly
 }
 
 KTEST(scene_file_save_rejects_bad_targets) {
-    TempDir dir;
+    ktest::TempDir dir;
     KCHECK_EQ(code_of(save_scene_file(sample_scene(), fs::path())), std::string("file.invalid_path"));
     KCHECK_EQ(code_of(save_scene_file(sample_scene(), dir.path() / "")), std::string("file.invalid_path"));
 
@@ -192,7 +170,7 @@ KTEST(scene_file_save_rejects_bad_targets) {
 }
 
 KTEST(scene_file_load_reports_missing_and_non_regular_files) {
-    TempDir dir;
+    ktest::TempDir dir;
     auto missing = load_scene_file(dir / "nope.kscene");
     KCHECK_EQ(code_of(missing), std::string("file.not_found"));
     if (!missing.ok()) KCHECK(missing.error().message.find("nope.kscene") != std::string::npos);
@@ -203,7 +181,7 @@ KTEST(scene_file_load_reports_missing_and_non_regular_files) {
 }
 
 KTEST(scene_file_load_rejects_empty_truncated_and_garbage_files) {
-    TempDir dir;
+    ktest::TempDir dir;
     const std::string good = save_scene_to_string(sample_scene()).value();
 
     spit(dir / "empty.kscene", "");
@@ -239,7 +217,7 @@ KTEST(scene_file_load_rejects_empty_truncated_and_garbage_files) {
 }
 
 KTEST(scene_file_load_passes_content_errors_through_with_path) {
-    TempDir dir;
+    ktest::TempDir dir;
     spit(dir / "newer.kscene", R"({"schema":"kengine.scene","schema_version":9,"objects":[]})");
     auto newer = load_scene_file(dir / "newer.kscene");
     KCHECK_EQ(code_of(newer), std::string("scene.schema.unsupported_version"));
@@ -254,7 +232,7 @@ KTEST(scene_file_load_passes_content_errors_through_with_path) {
 }
 
 KTEST(scene_file_load_enforces_size_limit_exactly) {
-    TempDir dir;
+    ktest::TempDir dir;
     KCHECK(save_scene_file(sample_scene(), dir / "s.kscene").ok());
     const std::size_t size = static_cast<std::size_t>(fs::file_size(dir / "s.kscene"));
     KCHECK(load_scene_file(dir / "s.kscene", size).ok());                              // exactly at the limit
@@ -273,7 +251,7 @@ KTEST(scene_file_load_refuses_devices_instead_of_reading_them) {
 }
 
 KTEST(scene_file_large_scene_round_trips) {
-    TempDir dir;
+    ktest::TempDir dir;
     Scene s;
     ObjectHandle parent = kNullObjectHandle;
     for (int i = 0; i < 5000; ++i) {

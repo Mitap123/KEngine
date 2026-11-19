@@ -75,16 +75,19 @@ CMake configure/build/ctest (no cmake); any Qt/GUI/viewport/screenshot test; int
 3. JSON numbers are doubles (exact integers to 2^53). Unknown scene fields are dropped on re-save (documented).
 4. (Resolved in ADR-0010: Euler order `Ry*Rx*Rz`, transforms are local.) Euler angles still have gimbal lock at pitch ±90°.
 5. The Direct3D 11 / Qt path is unverified on real hardware (ADR-0004); the hardware facts about the i5-560M iGPU are recollection. Qt licensing (ADR-0005) and the manifest format (ADR-0006) are unresolved.
-9. Spike shader normals are exact only for uniform scale. Non-ASCII file paths on Windows are untested (`path.string()` in error messages may mis-encode). The non-POSIX scene-file fallback and MSVC/MinGW builds are unverified. Qt 6 may not support Windows 7/8 (unverified); the owner's Windows version is unknown.
+9. Spike shader normals are exact only for uniform scale. Non-ASCII file paths on Windows are untested (`path.string()` in error messages may mis-encode). The non-POSIX scene-file fallback and MSVC/MinGW builds are unverified. Windows 7/8 are out of scope (owner decision).
 6. `.kscene` extension is only proposed.
 7. Scene file I/O: the `.bak` copy is not atomic (a crash mid-copy can damage the backup, never the target); `fsync` ordering and directory-fsync effectiveness cannot be tested here; a crash can leave stray `.tmp` files; save does not create missing directories (by design).
 8. `fault_injection` is a production-visible test seam in `SaveOptions`; keep it empty outside tests.
 
+## Decisions by the project owner
+- 2026-11-19: K Engine's license is **deferred** (not needed for now). No LICENSE file. Re-open before any binary distribution (ADR-0005).
+- 2026-11-19: supported platforms are **Windows 10 and 11 (x64)**; Windows 7/8 are out of scope.
+
 ## Open questions for the project owner
-1. License for K Engine (no LICENSE file added deliberately).
-2. Windows version, Qt version/kit (MSVC or MinGW), compiler, GPU driver version (needed to interpret the spike results).
-3. Commercial Qt license an option, and will Editor binaries be redistributed? (ADR-0005)
-4. Is a non-Windows Editor/viewport ever required? (It would need a second renderer backend behind `DrawList`.)
+1. Qt kit (MSVC or MinGW), compiler, and GPU driver version, needed to interpret the spike results.
+2. Commercial Qt license an option, and will Editor binaries be redistributed? (ADR-0005; only matters at distribution time.)
+3. Is a non-Windows Editor/viewport ever required? (It would need a second renderer backend behind `DrawList`.)
 
 ## Next task (exact)
 **M05-T03b (owner action): run the spike on the i5-560M machine.** Follow `Editor/Spike/README.md` Steps 0–3 and send back: `ctest` output (this is also the first real run of `CMakeLists.txt`), the full `k_gpu_probe` output, the viewport console output/exit codes (including `--screenshot out.png --no-warp`), `out.png`, and Windows/driver/Qt/compiler versions. Expect possible small compile fixes in the Windows-only files; send the compiler output.

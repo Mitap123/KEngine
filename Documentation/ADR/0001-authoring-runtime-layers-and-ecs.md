@@ -24,7 +24,7 @@ Option 2.
   - One `SceneObject` of kind cube/sphere/plane/empty → one runtime entity. Editor-only objects (gizmos, helpers; future) → no entity. Runtime-only entities (spawned during Play) → no `SceneObject`.
   - Component classes: *authoring-only* (editor metadata, name label), *runtime-only* (physics bodies, render proxies), *bridged* (Transform, primitive mesh kind). Bridged data is **copied** authoring→runtime at Play start; runtime changes never flow back unless the user triggers an explicit "apply".
   - Destruction: destroying a `SceneObject` destroys its descendants (implemented); a runtime entity's lifetime is owned by the World. References between layers use UUID, never raw handles from the other layer.
-- **Play isolation (M0.5):** Play starts from an independent copy of the authoring scene state; Stop discards the copy. The concrete mechanism (deep copy vs serialize-reload) is chosen in M05-T07; both are testable against the same acceptance test.
+- **Play isolation (M0.5):** Play starts from an independent copy of the authoring scene state; Stop discards the copy. **Decided in ADR-0011:** an independent value copy of the `Scene` (not serialize-reload).
 
 ## Evidence
 - Verified: the authoring layer exists and passes unit tests (see TESTING.md).

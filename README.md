@@ -9,4 +9,4 @@ make check                 # build + run unit and CLI tests
 
 Start here: `AGENTS.md` (rules), `DEVELOPMENT_STATUS.md` (current state and next task), `BUILDING.md`, `TESTING.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `FEATURE_MATRIX.md`, `Documentation/ADR/`.
 
-License: **not yet chosen** (open decision for the project owner; see ADR-0005). No LICENSE file is included on purpose.
+Supported platforms: **Windows 10 and 11 (x64)**. The portable core is also built and tested on Linux. License: **deferred by the owner** (not needed yet; see ADR-0005); no LICENSE file is included on purpose.

@@ -199,3 +199,38 @@ KTEST(scene_very_deep_hierarchy_does_not_overflow_the_stack) {
     KCHECK(s.destroy(top).ok());
     KCHECK_EQ(s.object_count(), static_cast<std::size_t>(0));
 }
+
+KTEST(scene_sibling_index_insertion_and_reordering) {
+    Scene s;
+    auto a = must_create(s, ObjectKind::Empty, "a");
+    auto b = must_create(s, ObjectKind::Empty, "b");
+    auto c = must_create(s, ObjectKind::Empty, "c");
+    KCHECK(s.sibling_index(a) == 0u && s.sibling_index(b) == 1u && s.sibling_index(c) == 2u);
+
+    // Insert at an explicit position (used to undo a delete at its old place).
+    auto mid = s.create_with_uuid(Uuid::from_random_words(9, 9), ObjectKind::Cube, "mid", kNullObjectHandle, 1);
+    KCHECK(mid.ok());
+    if (mid.ok()) KCHECK(s.sibling_index(mid.value()) == 1u && s.sibling_index(b) == 2u);
+    // Out-of-range indices clamp to "append"; they are not errors.
+    auto last = s.create_with_uuid(Uuid::from_random_words(8, 8), ObjectKind::Cube, "last", kNullObjectHandle, 999);
+    KCHECK(last.ok());
+    if (last.ok()) KCHECK(s.sibling_index(last.value()) == s.roots().size() - 1);
+
+    // Reparent to an explicit index under a parent, then reorder within the same parent.
+    auto p = must_create(s, ObjectKind::Empty, "p");
+    auto k1 = must_create(s, ObjectKind::Cube, "k1", p);
+    auto k2 = must_create(s, ObjectKind::Cube, "k2", p);
+    KCHECK(s.reparent(a, p, 0).ok());                       // a becomes p's first child
+    KCHECK(s.sibling_index(a) == 0u && s.sibling_index(k1) == 1u && s.sibling_index(k2) == 2u);
+    KCHECK(s.reparent(a, p, 1).ok());                       // same parent: index is after removal
+    KCHECK(s.sibling_index(k1) == 0u && s.sibling_index(a) == 1u && s.sibling_index(k2) == 2u);
+    KCHECK(s.reparent(a, p).ok());                          // default appends
+    KCHECK(s.sibling_index(a) == 2u);
+    // A failed reparent (cycle) changes nothing.
+    KCHECK_EQ(code_of(s.reparent(p, k1, 0)), std::string("scene.cycle"));
+    KCHECK(s.get(p)->parent.is_null());
+
+    KCHECK(!s.sibling_index(kNullObjectHandle).has_value());
+    KCHECK(s.destroy(c).ok());
+    KCHECK(!s.sibling_index(c).has_value());                // stale handle
+}

@@ -23,6 +23,8 @@
 
 #include <array>
 #include <cstddef>
+#include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -63,15 +65,20 @@ struct SceneObject {
 
 class Scene {
 public:
+    // Pass as a sibling index to append as the last sibling.
+    static constexpr std::size_t kAppend = std::numeric_limits<std::size_t>::max();
+
     // Creates an object with a freshly generated UUID. `parent` must be null
     // (root) or a valid handle. Error codes: scene.invalid_handle.
     Result<ObjectHandle> create(ObjectKind kind, std::string name, ObjectHandle parent = kNullObjectHandle);
 
     // Creates an object with a caller-supplied UUID (used by load and by
-    // undo of a delete). Error codes: scene.nil_uuid, scene.duplicate_uuid,
+    // undo of a delete) at `sibling_index` among its siblings (clamped: an index
+    // beyond the end appends). Error codes: scene.nil_uuid, scene.duplicate_uuid,
     // scene.invalid_handle.
     Result<ObjectHandle> create_with_uuid(const Uuid& id, ObjectKind kind, std::string name,
-                                    ObjectHandle parent = kNullObjectHandle);
+                                          ObjectHandle parent = kNullObjectHandle,
+                                          std::size_t sibling_index = kAppend);
 
     // Destroys the object and all descendants. Error: scene.invalid_handle.
     Status destroy(ObjectHandle h);
@@ -79,7 +86,14 @@ public:
     // Moves `h` under `new_parent` (null = make root), appended as last child.
     // Errors: scene.invalid_handle, scene.cycle (new_parent is h or a
     // descendant of h).
-    Status reparent(ObjectHandle h, ObjectHandle new_parent);
+    // `sibling_index` is the position among the new siblings AFTER `h` has been
+    // removed from its old position; kAppend (or any index >= the sibling count)
+    // appends. Same-parent calls therefore reorder.
+    Status reparent(ObjectHandle h, ObjectHandle new_parent, std::size_t sibling_index = kAppend);
+
+    // Position of `h` among its siblings (roots or its parent's children), or
+    // nullopt for an invalid handle.
+    std::optional<std::size_t> sibling_index(ObjectHandle h) const;
 
     Status set_name(ObjectHandle h, std::string name);
     // Errors: scene.invalid_handle, scene.non_finite_transform.

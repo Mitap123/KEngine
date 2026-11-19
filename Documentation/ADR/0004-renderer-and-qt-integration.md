@@ -58,6 +58,7 @@ Replace the backend behind `DrawList`; scene files, the Scene model, picking and
 4. Record OS version, GPU driver version, Qt version/kit and compiler in `DEVELOPMENT_STATUS.md`. If any step fails, fix this ADR before writing more viewport code.
 
 ## Open questions for the owner
-1. Windows version (Qt 6 may not support Windows 7/8 — **UNVERIFIED**; if Windows 7 must be supported, the Qt choice needs review)?
-2. Qt kit: MSVC or MinGW (affects the D3D compiler import library name and warnings)?
-3. Is a non-Windows viewport ever required?
+1. Qt kit: MSVC or MinGW (affects the D3D compiler import library name and warnings)?
+2. Is a non-Windows viewport ever required?
+
+**Resolved by the owner (2026-11-19):** supported Windows versions are **Windows 10 and Windows 11** (x64). Windows 7/8 are out of scope, which removes the old-runtime concerns (Direct3D 11 runtime availability, `d3dcompiler_47.dll` redistribution — the latter believed to ship with Windows 10/11, **UNVERIFIED**). Qt 6's own Windows 10+ requirement is recollection (**UNVERIFIED**) but consistent with this target. The Intel driver situation for a 2010 iGPU on Windows 10/11 is the real unknown and is what `k_gpu_probe` measures.

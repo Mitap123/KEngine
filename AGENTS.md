@@ -51,6 +51,7 @@ CMake is written but UNVERIFIED (no cmake in the original dev environment); see 
 - Never serialize Handles or addresses. Only UUIDs are persistent.
 
 ## Hardware floor and platform rules
+- **Supported platforms (owner decision): Windows 10 and Windows 11, x64.** Linux is used only as a convenient environment for the portable, Qt-free core and its tests; it is not a product platform. K Engine's own license is deliberately undecided (deferred): do not add a LICENSE file.
 - Target hardware floor (owner requirement): **Direct3D 10.1** class GPU (Intel Core i5-560M iGPU). Renderer: Direct3D 11 API at feature level 10_1 (ADR-0004). Shaders Shader Model 4.0 only; no compute/tessellation/MSAA by default; render on demand.
 - `Engine/*` is portable and API-neutral; renderers consume only `DrawList`. Only `Editor/` may use Windows/Direct3D/Qt. Use Qt **Widgets** only (no Qt Quick/QRhi/QOpenGLWidget).
 - Math/coordinate conventions are fixed by ADR-0010 (right-handed, +Y up, row-major `Mat4`, column vectors, Euler `Ry*Rx*Rz`, local transforms, CCW front faces, depth [0,1]). Do not change them without an ADR and a schema bump.
