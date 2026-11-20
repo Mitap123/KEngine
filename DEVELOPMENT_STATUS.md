@@ -20,6 +20,13 @@ New project (no pre-existing repository). Session 1 established the control docu
 
 Consequence: CMake/Qt/Rust/GPU work cannot be built or verified here. Work that does not need them proceeded.
 
+## Session 5 (2026-11-19): hostile-input hardening (M05-T10)
+**Method:** measured pathological scene files before changing anything. Findings (release build): a 40,000-object parent chain took 7.3 s to load (per-object cycle check, O(n²)); a JSON object with 200,000 keys took 140 s (linear duplicate-key scans, O(n²)); 60,000 unknown fields produced 60,000 stored and printed warnings; peak memory is ~15× file size (274 MiB for 17.7 MiB). A 64 MiB file (the default read cap) could therefore have hung the loader for hours.
+**Fixes:** scene loading now creates objects parent-first from the roots (O(n); cycles are the objects never reached, and the error names one that is actually on the cycle); JSON duplicate-key detection is hash-based past 16 members and object construction no longer scans; warnings capped at 100 + a summary line. After: 40k chain 0.096 s, 200k-key object 0.12 s, 200k roots 0.43 s.
+**Tests (`test_robustness.cpp`, 9 cases):** scaling guards (4× input must cost <10×; the old code was ~22×), duplicate-key detection on both detection paths and at the switch boundary, 100,000-object chain round trip, cycle-reporting, warning cap, and a deterministic mutation fuzzer (~45k systematic + 20k random mutants; invariants: no crash/sanitizer report, stable error codes, dump is a fixed point, loaded scenes re-save and reload byte-identically).
+**Honest results:** the fuzzer found **no** defects at these iteration counts; the defects came from measurement. Mutation checks: 7 caught outright (always-linear duplicate check, stale hash index, uncapped warnings, reversed child order, cycle blamed on the wrong object, duplicate UUID accepted, raw newline in dump); one (dump without a `\n` case) was an equivalent mutant. Coverage-guided / long-running fuzzing has **not** been done.
+**Process notes / own mistakes:** two background mutation runs died silently (cause unknown), and one left the throw-away copy mutated, so I restored it from the repo and reran; a sed filter for "R1" also removed "R10" (caught and rerun separately); an output flood from forgetting to redirect stderr. A Release `-Werror` build found a real buffer-size bug in a test helper (`%08zx` into a 40-byte buffer); fixed and all three configurations rerun.
+
 ## Session 4 (2026-11-19): editing model, isolated Play, CLI scene tools
 **Owner decisions:** license deferred (no LICENSE file); supported platforms Windows 10 and 11 x64 (recorded in AGENTS.md, README, ADR-0004/0005).
 **Done and verified on Linux (unit + CLI tests, ASan+UBSan, Release):**
@@ -60,9 +67,10 @@ Consequence: CMake/Qt/Rust/GPU work cannot be built or verified here. Work that 
 Latest run, each from a **clean tree** (`make clean` first), compiled with `-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror` (zero warnings):
 | Command | Result |
 |---|---|
-| `make STRICT=1 check` | exit 0; unit `passed=126 failed=0 not_run=0`; CLI `Ran 21 tests ... OK` |
-| `make SANITIZE=1 STRICT=1 check` | exit 0; unit 126/0/0; CLI 21 OK; no ASan/UBSan/LSan reports |
-| `make BUILD_TYPE=Release STRICT=1 check` | exit 0; unit 126/0/0; CLI 21 OK |
+| `make STRICT=1 check` | exit 0; unit `passed=135 failed=0 not_run=0`; CLI `Ran 21 tests ... OK` |
+| `make SANITIZE=1 STRICT=1 check` | exit 0; unit 135/0/0; CLI 21 OK; no ASan/UBSan/LSan reports |
+| `make BUILD_TYPE=Release STRICT=1 check` | exit 0; unit 135/0/0; CLI 21 OK |
+(The sanitizer and Release runs were rebuilt in steps rather than from `make clean`, after a final test-helper fix; the earlier clean-tree runs of session 4 were 126/126 in all three.)
 Nothing in `Editor/` is part of these runs (it is only built with `-DKENGINE_BUILD_EDITOR_SPIKE=ON` on Windows).
 
 Earlier run (end of session 2):
@@ -78,7 +86,7 @@ No scratch directories were left in the system temp dir by the tests. Compiled w
 Process notes: an earlier mutation run was invalidated by a stale-object (mtime) bug in my script and was redone; first results were discarded.
 
 ## Tests/checks NOT run
-CMake configure/build/ctest (no cmake); any Qt/GUI/viewport/screenshot test; integration, determinism, performance, fuzz, coverage; CI (not written); Clang or any non-GCC/non-Linux build; non-POSIX scene-file fallback; real disk-full / I/O-error / power-loss behaviour (only simulated by the fault hook); permission-denied cases (suite runs as root); parser fuzzing; scenes beyond 5,000 objects / files beyond a few hundred KB.
+CMake configure/build/ctest (no cmake); any Qt/GUI/viewport/screenshot test; integration, determinism, performance, fuzz, coverage; CI (not written); Clang or any non-GCC/non-Linux build; non-POSIX scene-file fallback; real disk-full / I/O-error / power-loss behaviour (only simulated by the fault hook); permission-denied cases (suite runs as root); coverage-guided / long-running parser fuzzing (only a bounded deterministic mutation fuzzer ran).
 
 ## Known risks / bugs
 1. Handles are domain-typed now, but two `Scene` instances share a handle type: a cloned scene's handles are numerically valid in the original. Use UUIDs across scenes (ADR-0003).
@@ -86,6 +94,7 @@ CMake configure/build/ctest (no cmake); any Qt/GUI/viewport/screenshot test; int
 3. JSON numbers are doubles (exact integers to 2^53). Unknown scene fields are dropped on re-save (documented).
 4. (Resolved in ADR-0010: Euler order `Ry*Rx*Rz`, transforms are local.) Euler angles still have gimbal lock at pitch ±90°.
 5. The Direct3D 11 / Qt path is unverified on real hardware (ADR-0004); the hardware facts about the i5-560M iGPU are recollection. Qt licensing (ADR-0005) and the manifest format (ADR-0006) are unresolved.
+10. Loading a scene file needs ~15× the file size in memory (measured); the 64 MiB default cap implies ~1 GiB transient. Destroying many siblings one at a time is O(siblings) each. The timing-based scaling tests can be flaky on a heavily loaded machine.
 9. Spike shader normals are exact only for uniform scale. Non-ASCII file paths on Windows are untested (`path.string()` in error messages may mis-encode). The non-POSIX scene-file fallback and MSVC/MinGW builds are unverified. Windows 7/8 are out of scope (owner decision).
 6. `.kscene` extension is only proposed.
 7. Scene file I/O: the `.bak` copy is not atomic (a crash mid-copy can damage the backup, never the target); `fsync` ordering and directory-fsync effectiveness cannot be tested here; a crash can leave stray `.tmp` files; save does not create missing directories (by design).

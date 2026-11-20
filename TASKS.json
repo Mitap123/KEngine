@@ -590,6 +590,34 @@
           "out_of_scope": [
             "Declaring the entire Editor production-ready"
           ]
+        },
+        {
+          "id": "M05-T10",
+          "title": "Harden the JSON parser and scene loader against hostile input",
+          "status": "done",
+          "priority": "P1",
+          "depends_on": [
+            "M05-T05"
+          ],
+          "scope": [
+            "Engine/Serialization",
+            "Tests/Unit"
+          ],
+          "acceptance_criteria": [
+            "Loading time is linear for deep hierarchies and wide JSON objects (measured before and after)",
+            "Warnings and error output are bounded",
+            "Deterministic mutation fuzzing runs clean under ASan+UBSan",
+            "Regression tests fail when the old quadratic behaviour is reintroduced"
+          ],
+          "evidence": [
+            "Tests/Unit/test_robustness.cpp",
+            "Documentation/ADR/0006-data-formats-and-migration.md (Hostile-input policy)"
+          ],
+          "verification_commands": [
+            "make STRICT=1 test",
+            "make SANITIZE=1 STRICT=1 test"
+          ],
+          "notes": "Found by measurement, not by fuzzing: chain of 40k objects 7.3 s -> 0.1 s; 200k-key object 140 s -> 0.12 s. Remaining: memory ~15x file size (documented); no coverage-guided fuzzing."
         }
       ]
     }

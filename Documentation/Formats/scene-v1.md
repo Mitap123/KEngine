@@ -51,6 +51,9 @@ Sibling order: children of a parent keep the relative order in which they appear
 ## Error codes (stable)
 `json.syntax`, `scene.schema.invalid_root`, `scene.schema.missing_field`, `scene.schema.wrong_type`, `scene.schema.unknown_schema`, `scene.schema.unsupported_version`, `scene.object.invalid_uuid`, `scene.object.unknown_kind`, `scene.object.missing_parent`, `scene.transform.invalid`, `scene.nil_uuid`, `scene.duplicate_uuid`, `scene.cycle`. Messages include a pointer such as `/objects/3/parent`; match on `code`, not message text.
 
+## Limits and hostile input
+Scene files are treated as untrusted. Loading is linear in file size at any hierarchy depth. At most 100 warnings are reported (then one "... and N more warnings suppressed" line). A parent cycle is reported as `scene.cycle` pointing at the object with the smallest file index that is actually on the cycle. Defaults: file size ≤ 64 MiB, JSON nesting ≤ 128. Memory while loading is roughly 15× the file size (measured), see ADR-0006.
+
 ## Versioning
 Any incompatible change bumps `schema_version` and adds a migration step (`vN → vN+1`). Additive optional fields do not bump the version but older tools will drop them on re-save.
 

@@ -3,6 +3,7 @@
 #include <charconv>
 #include <cmath>
 #include <system_error>
+#include <unordered_set>
 
 namespace k {
 
@@ -20,6 +21,13 @@ std::optional<std::int64_t> Json::as_int() const {
     // 2^63 is exactly representable as a double; anything >= it overflows int64.
     if (n_ >= 9223372036854775808.0 || n_ < -9223372036854775808.0) return std::nullopt;
     return static_cast<std::int64_t>(n_);
+}
+
+Json Json::object_from_unique_members(std::vector<std::pair<std::string, Json>> members) {
+    Json j;
+    j.type_ = Type::Object;
+    j.obj_ = std::move(members);
+    return j;
 }
 
 void Json::push_back(Json v) {
@@ -140,16 +148,38 @@ private:
 
     bool parse_object(Json& out, int depth) {
         ++pos_;  // '{'
-        out = Json::object();
+        std::vector<std::pair<std::string, Json>> members;
+        // Duplicate detection: a linear scan is fastest for the usual handful of
+        // keys; past kScanLimit members switch to a hash set so that an object
+        // with hundreds of thousands of keys cannot cost O(n^2).
+        constexpr std::size_t kScanLimit = 16;
+        std::unordered_set<std::string> seen;
+        auto is_duplicate = [&](const std::string& key) {
+            if (members.size() < kScanLimit) {
+                for (const auto& m : members) {
+                    if (m.first == key) return true;
+                }
+                return false;
+            }
+            if (seen.empty()) {
+                for (const auto& m : members) seen.insert(m.first);
+            }
+            return seen.count(key) != 0;
+        };
+
         skip_ws();
-        if (!at_end() && peek() == '}') { ++pos_; return true; }
+        if (!at_end() && peek() == '}') {
+            ++pos_;
+            out = Json::object();
+            return true;
+        }
         for (;;) {
             skip_ws();
             if (at_end() || peek() != '"') return fail("expected string key in object");
             const std::size_t key_pos = pos_;
             std::string key;
             if (!parse_string(key)) return false;
-            if (out.find(key) != nullptr) {
+            if (is_duplicate(key)) {
                 pos_ = key_pos;
                 return fail("duplicate object key \"" + key + "\"");
             }
@@ -159,11 +189,16 @@ private:
             skip_ws();
             Json v;
             if (!parse_value(v, depth + 1)) return false;
-            out.set(std::move(key), std::move(v));
+            if (!seen.empty()) seen.insert(key);  // keep the index in sync once it exists
+            members.emplace_back(std::move(key), std::move(v));
             skip_ws();
             if (at_end()) return fail("unterminated object");
             if (peek() == ',') { ++pos_; continue; }
-            if (peek() == '}') { ++pos_; return true; }
+            if (peek() == '}') {
+                ++pos_;
+                out = Json::object_from_unique_members(std::move(members));
+                return true;
+            }
             return fail("expected ',' or '}' in object");
         }
     }

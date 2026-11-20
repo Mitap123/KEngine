@@ -1,7 +1,9 @@
 #include "Engine/Serialization/SceneSerializer.h"
 
+#include <algorithm>
 #include <initializer_list>
 #include <string>
+#include <unordered_map>
 
 namespace k {
 
@@ -21,16 +23,38 @@ Error missing_field(const std::string& path) {
     return make_error("scene.schema.missing_field", path + ": required field is missing");
 }
 
+// Collects warnings with a hard cap, so a hostile file with a million unknown
+// fields cannot exhaust memory or flood a terminal. Past the cap only a count is kept.
+class WarningSink {
+public:
+    static constexpr std::size_t kMaxWarnings = 100;
+    explicit WarningSink(std::vector<std::string>& out) : out_(out) {}
+    void add(std::string message) {
+        if (out_.size() < kMaxWarnings) out_.push_back(std::move(message));
+        else ++suppressed_;
+    }
+    // Appends "... and N more warnings suppressed" if anything was dropped.
+    void finish() {
+        if (suppressed_ > 0) {
+            out_.push_back("... and " + std::to_string(suppressed_) + " more warnings suppressed");
+            suppressed_ = 0;
+        }
+    }
+private:
+    std::vector<std::string>& out_;
+    std::size_t suppressed_ = 0;
+};
+
 // Records every member of `obj` that is not in `known` as a warning.
 void warn_unknown(const Json& obj, const std::string& path,
-                  std::initializer_list<const char*> known, std::vector<std::string>& warnings) {
+                  std::initializer_list<const char*> known, WarningSink& warnings) {
     for (const auto& m : obj.members()) {
         bool is_known = false;
         for (const char* k : known) {
             if (m.first == k) { is_known = true; break; }
         }
         if (!is_known) {
-            warnings.push_back(path + ": unknown field \"" + m.first + "\" ignored (not preserved on save)");
+            warnings.add(path + ": unknown field \"" + m.first + "\" ignored (not preserved on save)");
         }
     }
 }
@@ -59,7 +83,7 @@ struct Record {
     std::string path;
 };
 
-Result<Record> parse_record(const Json& j, const std::string& path, std::vector<std::string>& warnings) {
+Result<Record> parse_record(const Json& j, const std::string& path, WarningSink& warnings) {
     if (!j.is_object()) return wrong_type(path, "an object");
     warn_unknown(j, path, {"id", "name", "kind", "parent", "transform"}, warnings);
 
@@ -177,7 +201,8 @@ Result<LoadedScene> scene_from_json(const Json& root) {
     // migration registry here once a second version exists (ADR-0006).
 
     LoadedScene out;
-    warn_unknown(root, "/", {"schema", "schema_version", "objects"}, out.warnings);
+    WarningSink warnings(out.warnings);
+    warn_unknown(root, "/", {"schema", "schema_version", "objects"}, warnings);
 
     const Json* objects = root.find("objects");
     if (!objects) return missing_field("/objects");
@@ -186,37 +211,79 @@ Result<LoadedScene> scene_from_json(const Json& root) {
     std::vector<Record> records;
     records.reserve(objects->items().size());
     for (std::size_t i = 0; i < objects->items().size(); ++i) {
-        auto rec = parse_record(objects->items()[i], "/objects/" + std::to_string(i), out.warnings);
+        auto rec = parse_record(objects->items()[i], "/objects/" + std::to_string(i), warnings);
         if (!rec) return rec.error();
         records.push_back(std::move(rec).value());
     }
+    const std::size_t n = records.size();
 
-    // Pass 1: create every object (as a root) so parents may appear anywhere.
-    std::vector<ObjectHandle> handles;
-    handles.reserve(records.size());
-    for (const Record& r : records) {
-        auto h = out.scene.create_with_uuid(r.id, r.kind, r.name);
-        if (!h) {
-            return make_error(h.error().code, r.path + "/id: " + h.error().message);
+    // Validate identity first, in file order: nil and duplicate UUIDs.
+    std::unordered_map<Uuid, std::size_t, Uuid::Hash> index_of;
+    index_of.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        if (records[i].id.is_nil()) {
+            return make_error("scene.nil_uuid", records[i].path + "/id: an object cannot have the nil UUID");
         }
-        handles.push_back(h.value());
-        if (auto st = out.scene.set_transform(h.value(), r.transform); !st) {
-            return make_error(st.error().code, r.path + "/transform: " + st.error().message);
+        if (!index_of.emplace(records[i].id, i).second) {
+            return make_error("scene.duplicate_uuid", records[i].path + "/id: UUID " + records[i].id.to_string() +
+                                                          " is already used in this scene");
         }
     }
 
-    // Pass 2: link parents in file order, which preserves sibling order.
-    for (std::size_t i = 0; i < records.size(); ++i) {
-        if (!records[i].parent) continue;
-        const ObjectHandle parent = out.scene.find_by_uuid(*records[i].parent);
-        if (parent.is_null()) {
+    // Resolve parents to indices (missing parents are errors) and build child lists in file order.
+    constexpr std::size_t kNoParent = static_cast<std::size_t>(-1);
+    std::vector<std::size_t> parent_of(n, kNoParent);
+    std::vector<std::vector<std::size_t>> children(n);
+    std::vector<std::size_t> roots;
+    for (std::size_t i = 0; i < n; ++i) {
+        if (!records[i].parent) {
+            roots.push_back(i);
+            continue;
+        }
+        const auto it = index_of.find(*records[i].parent);
+        if (it == index_of.end()) {
             return make_error("scene.object.missing_parent",
                               records[i].path + "/parent: no object has UUID " + records[i].parent->to_string());
         }
-        if (auto st = out.scene.reparent(handles[i], parent); !st) {
-            return make_error(st.error().code, records[i].path + "/parent: " + st.error().message);
-        }
+        parent_of[i] = it->second;
+        children[it->second].push_back(i);
     }
+
+    // Create every object parent-first (iterative preorder from the roots, children in file
+    // order). A freshly created object can never close a cycle, so no per-object cycle check
+    // is needed: building is O(n) however deep the hierarchy is. Sibling order is preserved
+    // because children are appended in file order.
+    std::vector<ObjectHandle> handles(n);
+    std::size_t created = 0;
+    std::vector<std::size_t> stack(roots.rbegin(), roots.rend());
+    while (!stack.empty()) {
+        const std::size_t i = stack.back();
+        stack.pop_back();
+        const Record& r = records[i];
+        const ObjectHandle parent = parent_of[i] == kNoParent ? kNullObjectHandle : handles[parent_of[i]];
+        auto h = out.scene.create_with_uuid(r.id, r.kind, r.name, parent);
+        if (!h) return make_error(h.error().code, r.path + "/id: " + h.error().message);
+        handles[i] = h.value();
+        if (auto st = out.scene.set_transform(h.value(), r.transform); !st) {
+            return make_error(st.error().code, r.path + "/transform: " + st.error().message);
+        }
+        ++created;
+        stack.insert(stack.end(), children[i].rbegin(), children[i].rend());
+    }
+
+    if (created != n) {
+        // Objects never reached from a root are in, or hang below, a parent cycle. Report an object
+        // that is really ON a cycle: walking n parent links from any unreached object lands on one.
+        std::size_t start = 0;
+        while (start < n && !handles[start].is_null()) ++start;
+        std::size_t on_cycle = start;
+        for (std::size_t step = 0; step < n; ++step) on_cycle = parent_of[on_cycle];
+        std::size_t first = on_cycle;  // smallest file index on that cycle, for a stable message
+        for (std::size_t cur = parent_of[on_cycle]; cur != on_cycle; cur = parent_of[cur]) first = std::min(first, cur);
+        return make_error("scene.cycle", records[first].path + "/parent: cannot make an object a descendant of itself");
+    }
+
+    warnings.finish();
     return out;
 }
 

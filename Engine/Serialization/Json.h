@@ -10,7 +10,8 @@
 //   * Strings must be valid UTF-8; control characters must be escaped;
 //     \u escapes (incl. surrogate pairs) are decoded to UTF-8; lone
 //     surrogates are rejected.
-//   * Duplicate object keys are rejected.
+//   * Duplicate object keys are rejected (hash-based, so a hostile object with
+//     hundreds of thousands of keys is handled in linear time).
 //   * Nesting deeper than kMaxDepth is rejected (stack-exhaustion guard).
 //   * Numbers are IEEE doubles. A number that overflows the double range, or
 //     is non-zero but underflows to zero (e.g. 1e-999), is rejected rather
@@ -67,8 +68,12 @@ public:
 
     // Array / object mutation. push_back is a no-op unless is_array().
     void push_back(Json v);
-    // Sets (or replaces) a member; no-op unless is_object().
+    // Sets (or replaces) a member; no-op unless is_object(). O(members): meant
+    // for building small objects, not for bulk construction.
     void set(std::string key, Json v);
+    // Builds an object from members whose keys the CALLER guarantees are unique
+    // (the parser verifies this in O(1) per key). O(1) per member.
+    static Json object_from_unique_members(std::vector<std::pair<std::string, Json>> members);
     // nullptr if not an object or key absent.
     const Json* find(std::string_view key) const;
 

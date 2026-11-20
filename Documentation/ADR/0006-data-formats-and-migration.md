@@ -23,6 +23,14 @@ Source data must be diffable, versioned, recoverable and safe to load from untru
 
 **Asset identity (planned, M3):** stable asset GUID in a sidecar `.meta`, independent of path; missing references reported, not silently dropped.
 
+## Hostile-input policy (added after measurement, 2026-11-19)
+Scene files are untrusted input (anyone can hand you one). Measured on the first implementation, release build, one core:
+- a chain of 40,000 parent→child objects took **7.3 s** to load (cycle check per object: O(n²)); a JSON object with 200,000 keys took **140 s** (linear duplicate-key scans: O(n²)); 60,000 unknown fields produced 60,000 stored/printed warnings.
+- After the fixes: the 40,000 chain loads in **0.1 s**, the 200,000-key object in **0.12 s**, 200,000 root objects in **0.4 s**, warnings are capped (100 + one summary line).
+Rules now in force: loading is O(n) in objects and members at any hierarchy depth (objects are created parent-first, so no per-object cycle check; cycles are found as objects never reached from a root, and the error names an object that is *on* the cycle); duplicate-key detection is hash-based past 16 members; at most 100 warnings are kept; nesting depth ≤ 128; file size ≤ 64 MiB by default (`load_scene_file(path, max_bytes)`).
+**Known remaining cost:** the in-memory JSON tree is fat. Measured peak RSS was ~274 MiB for a 17.7 MiB file (~15×), so a file at the 64 MiB default cap can transiently need on the order of 1 GiB. Bounded, but large for a low-memory machine; lower the cap or slim the `Json` node (single variant instead of five members) if it matters.
+Guarded by `Tests/Unit/test_robustness.cpp` (scaling tests, cap test, cycle-reporting test, deterministic mutation fuzzer).
+
 ## Options considered
 Binary scene format (rejected for source: poor diffs); TOML/YAML for scenes (parser surface/ambiguity; YAML rejected); JSON with comments (non-standard).
 
