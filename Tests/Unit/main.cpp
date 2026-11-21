@@ -4,6 +4,7 @@
 //   k_unit_tests                 run all
 //   k_unit_tests <substring>     run cases whose name contains <substring>
 //   k_unit_tests --list          list case names
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <exception>
@@ -47,6 +48,7 @@ int main(int argc, char** argv) {
         }
         ktest::reset_current_failures();
         std::printf("[ RUN  ] %s\n", c.name);
+        const auto started = std::chrono::steady_clock::now();
         try {
             c.fn();
         } catch (const std::exception& e) {
@@ -54,12 +56,13 @@ int main(int argc, char** argv) {
         } catch (...) {
             ktest::fail(__FILE__, __LINE__, "uncaught non-standard exception");
         }
+        const long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
         if (ktest::current_failures() == 0) {
             ++passed;
-            std::printf("[  OK  ] %s\n", c.name);
+            std::printf("[  OK  ] %s (%lld ms)\n", c.name, ms);
         } else {
             ++failed;
-            std::printf("[ FAIL ] %s (%d failed checks)\n", c.name, ktest::current_failures());
+            std::printf("[ FAIL ] %s (%d failed checks, %lld ms)\n", c.name, ktest::current_failures(), ms);
         }
     }
     std::printf("\nsummary: passed=%d failed=%d not_run=%d\n", passed, failed, not_run);

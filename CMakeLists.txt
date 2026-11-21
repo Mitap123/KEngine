@@ -59,6 +59,12 @@ kengine_apply_flags(k_unit_tests)
 enable_testing()
 add_test(NAME unit COMMAND k_unit_tests)
 
+option(KENGINE_FULL_TESTS "Also register unit_full (full-size, slow unit tests)" OFF)
+if(KENGINE_FULL_TESTS)
+  add_test(NAME unit_full COMMAND k_unit_tests)
+  set_tests_properties(unit_full PROPERTIES ENVIRONMENT "KENGINE_TEST_FULL=1" TIMEOUT 3600)
+endif()
+
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
   add_test(NAME cli

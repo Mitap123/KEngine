@@ -254,7 +254,8 @@ KTEST(scene_file_large_scene_round_trips) {
     ktest::TempDir dir;
     Scene s;
     ObjectHandle parent = kNullObjectHandle;
-    for (int i = 0; i < 5000; ++i) {
+    const int n_objects = static_cast<int>(ktest::scaled(2000, 5000));
+    for (int i = 0; i < n_objects; ++i) {
         auto h = s.create(i % 3 == 0 ? ObjectKind::Cube : ObjectKind::Sphere, "obj" + std::to_string(i),
                           i % 10 == 0 ? kNullObjectHandle : parent);
         parent = h.value();

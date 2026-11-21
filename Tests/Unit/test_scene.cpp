@@ -191,7 +191,7 @@ KTEST(scene_very_deep_hierarchy_does_not_overflow_the_stack) {
     Scene s;
     ObjectHandle cur = must_create(s, ObjectKind::Empty, "n0");
     const ObjectHandle top = cur;
-    constexpr int kDepth = 100000;
+    const int kDepth = static_cast<int>(ktest::scaled(10000, 100000));
     for (int i = 1; i < kDepth; ++i) cur = must_create(s, ObjectKind::Empty, "n", cur);
     std::size_t visited = 0;
     s.visit_preorder([&](ObjectHandle, const SceneObject&) { ++visited; });

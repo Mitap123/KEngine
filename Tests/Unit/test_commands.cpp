@@ -404,7 +404,8 @@ KTEST(editor_randomized_undo_redo_matches_snapshot_model) {
     };
 
     std::size_t edits_ok = 0, edits_rejected = 0, undos = 0, redos = 0;
-    for (int step = 0; step < 1500; ++step) {
+    const int steps = static_cast<int>(ktest::scaled(800, 1500));
+    for (int step = 0; step < steps; ++step) {
         const auto ids = all_ids();
         auto pick_id = [&] { return ids.empty() ? Uuid::from_random_words(7, 7) : ids[rnd(static_cast<std::uint32_t>(ids.size()))]; };
         auto pick_parent = [&] { return (ids.empty() || rnd(3) == 0) ? Uuid() : pick_id(); };
@@ -463,10 +464,10 @@ KTEST(editor_randomized_undo_redo_matches_snapshot_model) {
         KCHECK_EQ(ed.is_dirty(), cursor != 0);                // clean state is the initial empty scene
     }
     // The run must actually have exercised every path, or the check is vacuous.
-    KCHECK(edits_ok > 200);
+    KCHECK(edits_ok > static_cast<std::size_t>(steps) / 8);
     KCHECK(edits_rejected > 5);
-    KCHECK(undos > 100);
-    KCHECK(redos > 20);
+    KCHECK(undos > static_cast<std::size_t>(steps) / 15);
+    KCHECK(redos > static_cast<std::size_t>(steps) / 75);
 }
 
 // ------------------------------------------------------------------- Play ---

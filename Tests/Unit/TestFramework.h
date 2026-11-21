@@ -10,6 +10,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -30,6 +31,18 @@ void reset_current_failures();
 struct Registrar {
     Registrar(const char* name, void (*fn)()) { registry().push_back({name, fn}); }
 };
+
+// Test sizes: the default ("fast") mode keeps every test meaningful but small enough that
+// the whole suite is quick even on an old CPU with an unoptimized, iterator-checked STL
+// (the first Windows Debug run took 311 s). KENGINE_TEST_FULL=1 selects the full sizes.
+inline bool full_mode() {
+    static const bool v = [] {
+        const char* e = std::getenv("KENGINE_TEST_FULL");
+        return e != nullptr && e[0] == '1';
+    }();
+    return v;
+}
+inline std::size_t scaled(std::size_t fast, std::size_t full) { return full_mode() ? full : fast; }
 
 template <class T>
 std::string show(const T& v) {

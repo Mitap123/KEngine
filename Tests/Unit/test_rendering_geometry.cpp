@@ -217,7 +217,7 @@ KTEST(scene_transforms_bulk_computation_agrees_with_per_object_query) {
 
 KTEST(scene_transforms_survive_very_deep_hierarchies) {
     Scene s;
-    constexpr int kDepth = 100000;
+    const int kDepth = static_cast<int>(ktest::scaled(10000, 100000));
     ObjectHandle cur = add(s, ObjectKind::Empty, "n0");
     set(s, cur, {1, 0, 0});
     for (int i = 1; i < kDepth; ++i) {

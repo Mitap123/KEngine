@@ -10,6 +10,7 @@
 #   make BUILD_TYPE=Release   optimized build in a separate directory
 #   make SANITIZE=1 check     AddressSanitizer + UBSan build and test run
 #   make STRICT=1             treat warnings as errors
+#   make check-full           same with the full-size (slow) unit tests
 #   make clean                remove Build/
 
 CXX        ?= g++
@@ -54,7 +55,7 @@ ENGINE_LIB := $(BUILD_DIR)/libkengine_core.a
 CLI_BIN    := $(BUILD_DIR)/k
 TEST_BIN   := $(BUILD_DIR)/k_unit_tests
 
-.PHONY: all check test cli-test visual-selftest clean help
+.PHONY: all check check-full test test-full cli-test visual-selftest clean help
 all: $(CLI_BIN) $(TEST_BIN)
 
 $(BUILD_DIR)/%.o: %.cpp
@@ -74,12 +75,18 @@ $(TEST_BIN): $(TEST_OBJ) $(ENGINE_LIB)
 test: $(TEST_BIN)
 	$(TEST_BIN)
 
+# Full-size tests (100k-object hierarchies, long fuzz runs): minutes, not seconds.
+test-full: $(TEST_BIN)
+	KENGINE_TEST_FULL=1 $(TEST_BIN)
+
 cli-test: $(CLI_BIN)
 	KENGINE_CLI=$(abspath $(CLI_BIN)) python3 -m unittest discover -s Tests/CLI -v
 
 # Self-tests of the screenshot analysis (synthetic PNGs; no GPU, no exe).
 visual-selftest:
 	python3 -m unittest discover -s Tests/Visual -p test_png_probe.py -v
+
+check-full: test-full cli-test visual-selftest
 
 check: test cli-test visual-selftest
 

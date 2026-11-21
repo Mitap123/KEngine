@@ -9,6 +9,8 @@ Reports must distinguish **passed / failed / skipped / not-run**. The unit runne
 | CLI | `Tests/CLI/test_cli.py` (Python `unittest`) | `make cli-test` | `k --version`, `--help`, `doctor` (+`--json`), `scene validate`/`dump` (valid, invalid, hostile, deep files), usage errors, exit codes |
 | Sanitizers | same tests | `make SANITIZE=1 check` | ASan + UBSan on all of the above |
 
+**Fast vs full unit tests:** by default the heavy tests use reduced sizes (the first Windows Debug run took 311 s; Linux Debug was 35 s, now 4.3 s). `KENGINE_TEST_FULL=1` (`make check-full`, or `-DKENGINE_FULL_TESTS=ON` and ctest `unit_full`) runs the full sizes: 100,000-object hierarchies, full fuzz sweeps, 1,500-step undo model. Run the full mode before a release or after touching loading/hierarchy code. The runner prints per-test milliseconds.
+
 Filter unit cases: `Build/make-debug/k_unit_tests <substring>`; list: `--list`.
 
 | Visual self-test | `Tests/Visual/test_png_probe.py` | `make visual-selftest` | the PNG reader (all filter types, rejection of unsupported files; cross-checked once against PIL's independent encoder) and the black/lit pixel analysis, on synthetic images |

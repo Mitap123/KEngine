@@ -70,7 +70,7 @@ KTEST(robustness_json_object_with_many_keys_parses_in_linear_time) {
         KCHECK(r.ok());
         if (r.ok()) KCHECK_EQ(r.value().members().size(), n);
     };
-    check_scaling("json many keys", run, 10000);
+    check_scaling("json many keys", run, ktest::scaled(3000, 10000));
 }
 
 KTEST(robustness_json_duplicate_keys_are_detected_on_both_detection_paths) {
@@ -100,7 +100,7 @@ KTEST(robustness_loading_a_deep_parent_chain_is_linear) {
         auto r = load_scene_from_string(chain_scene(n));
         KCHECK(r.ok());
         if (r.ok()) KCHECK_EQ(r.value().scene.object_count(), n);
-    }, 10000);
+    }, ktest::scaled(3000, 10000));
 }
 
 KTEST(robustness_loading_a_huge_ring_reports_a_cycle_quickly) {
@@ -108,14 +108,16 @@ KTEST(robustness_loading_a_huge_ring_reports_a_cycle_quickly) {
         auto r = load_scene_from_string(chain_scene(n, /*close_ring=*/true));
         KCHECK(!r.ok());
         if (!r.ok()) KCHECK_EQ(r.error().code, std::string("scene.cycle"));
-    }, 10000);
+    }, ktest::scaled(3000, 10000));
 }
 
-KTEST(robustness_a_hundred_thousand_object_chain_loads_and_round_trips) {
-    auto r = load_scene_from_string(chain_scene(100000));
+// 100,000 objects in full mode (8,000 in the default fast mode).
+KTEST(robustness_a_large_object_chain_loads_and_round_trips) {
+    const std::size_t n = ktest::scaled(8000, 100000);
+    auto r = load_scene_from_string(chain_scene(n));
     KCHECK(r.ok());
     if (!r.ok()) return;
-    KCHECK_EQ(r.value().scene.object_count(), static_cast<std::size_t>(100000));
+    KCHECK_EQ(r.value().scene.object_count(), n);
     auto text = save_scene_to_string(r.value().scene);     // iterative traversal: no stack overflow
     KCHECK(text.ok());
     if (text.ok()) {
@@ -253,17 +255,20 @@ std::vector<std::string> seeds() {
 
 KTEST(fuzz_systematic_single_edits_never_crash_or_break_invariants) {
     FuzzStats st;
-    const char kReplacements[] = {'{', '}', '[', ']', ',', ':', '"', '\\', '0', '-', 'e', '.', 'n', '\x00', '\xff', ' '};
+    const std::size_t stride = ktest::full_mode() ? 1 : 3;
+    // Full mode: 16 replacement bytes at every position. Fast mode: the 5 most structurally disruptive.
+    std::vector<char> replacements = {'{', '}', '[', ']', ',', ':', '"', '\\', '0', '-', 'e', '.', 'n', '\x00', '\xff', ' '};
+    if (!ktest::full_mode()) replacements = {'{', ',', '"', '\\', '\xff'};
     for (const std::string& seed : seeds()) {
         exercise(seed, st);
-        // Every prefix.
-        for (std::size_t len = 0; len < seed.size(); ++len) exercise(seed.substr(0, len), st);
-        // Delete each byte; replace each byte by structurally interesting ones.
-        for (std::size_t i = 0; i < seed.size(); ++i) {
+        // Every prefix (every 3rd in fast mode).
+        for (std::size_t len = 0; len < seed.size(); len += stride) exercise(seed.substr(0, len), st);
+        // Delete each byte; replace each byte by structurally interesting ones (every 3rd position in fast mode).
+        for (std::size_t i = 0; i < seed.size(); i += stride) {
             std::string del = seed;
             del.erase(i, 1);
             exercise(del, st);
-            for (char r : kReplacements) {
+            for (char r : replacements) {
                 std::string rep = seed;
                 rep[i] = r;
                 exercise(rep, st);
@@ -276,7 +281,7 @@ KTEST(fuzz_systematic_single_edits_never_crash_or_break_invariants) {
 }
 
 KTEST(fuzz_random_multi_edit_mutants_never_crash_or_break_invariants) {
-    std::size_t iterations = 20000;
+    std::size_t iterations = ktest::scaled(4000, 20000);
     if (const char* env = std::getenv("KENGINE_FUZZ_ITERATIONS")) {
         iterations = static_cast<std::size_t>(std::strtoull(env, nullptr, 10));
     }
