@@ -151,6 +151,8 @@ KTEST(document_file_operations_title_dirty_and_failures) {
     KCHECK_EQ(code(e.open(dir / "bad.kscene")), std::string("json.syntax"));
     KCHECK(e.selected() == sel);
     KCHECK(e.is_dirty() && e.can_undo());
+    KCHECK_EQ(e.display_name(), std::string("scene.kscene"));        // a failed open must not change the document's path
+    KCHECK(e.path() == dir / "scene.kscene");
     KCHECK(e.scene().object_count() == 4 && before != snap(e.scene()));
 
     // New resets everything.
@@ -218,6 +220,22 @@ KTEST(document_play_stop_isolates_and_keeps_selection_and_history) {
     KCHECK(d.undo().ok());                                    // the transform edit made before Play is still undoable
     KCHECK(d.scene().get(d.scene().find_by_uuid(cube))->transform == Transform{});
     KCHECK_EQ(code(d.stop()), std::string("editor.not_playing"));
+}
+
+KTEST(document_stop_clears_a_selection_that_only_existed_in_the_play_copy) {
+    EditorDocument d;
+    const Uuid cube = make(d, ObjectKind::Cube);
+    KCHECK(d.play().ok());
+    // The "game" spawns an object; the user selects it (e.g. by clicking it in the viewport).
+    auto spawned = d.play_scene()->create(ObjectKind::Sphere, "spawned");
+    KCHECK(spawned.ok());
+    const Uuid spawned_id = d.play_scene()->get(spawned.value())->id;
+    KCHECK(d.select(spawned_id).ok());
+    KCHECK(d.selected_object() != nullptr && d.selected_object()->name == "spawned");
+    KCHECK(d.stop().ok());
+    KCHECK(d.selected().is_nil());                                    // the spawned object is gone: no dangling selection
+    KCHECK(d.selected_object() == nullptr && d.selected_handle().is_null());
+    KCHECK(!d.scene().find_by_uuid(cube).is_null());
 }
 
 KTEST(document_save_while_playing_writes_the_authored_scene) {
