@@ -45,13 +45,16 @@ LDFLAGS_ALL  := $(SAN) $(LDFLAGS)
 
 ENGINE_SRC := $(wildcard Engine/*/*.cpp)
 CLI_SRC    := Tools/CLI/main.cpp
+EDITOR_SRC := $(wildcard Editor/Core/*.cpp)
 TEST_SRC   := $(wildcard Tests/Unit/*.cpp)
 
 ENGINE_OBJ := $(ENGINE_SRC:%.cpp=$(BUILD_DIR)/%.o)
+EDITOR_OBJ := $(EDITOR_SRC:%.cpp=$(BUILD_DIR)/%.o)
 CLI_OBJ    := $(CLI_SRC:%.cpp=$(BUILD_DIR)/%.o)
 TEST_OBJ   := $(TEST_SRC:%.cpp=$(BUILD_DIR)/%.o)
 
 ENGINE_LIB := $(BUILD_DIR)/libkengine_core.a
+EDITOR_LIB := $(BUILD_DIR)/libkengine_editor_core.a
 CLI_BIN    := $(BUILD_DIR)/k
 TEST_BIN   := $(BUILD_DIR)/k_unit_tests
 
@@ -66,11 +69,15 @@ $(ENGINE_LIB): $(ENGINE_OBJ)
 	@rm -f $@
 	ar rcs $@ $^
 
+$(EDITOR_LIB): $(EDITOR_OBJ)
+	@rm -f $@
+	ar rcs $@ $^
+
 $(CLI_BIN): $(CLI_OBJ) $(ENGINE_LIB)
 	$(CXX) $(CLI_OBJ) $(ENGINE_LIB) $(LDFLAGS_ALL) -o $@
 
-$(TEST_BIN): $(TEST_OBJ) $(ENGINE_LIB)
-	$(CXX) $(TEST_OBJ) $(ENGINE_LIB) $(LDFLAGS_ALL) -o $@
+$(TEST_BIN): $(TEST_OBJ) $(EDITOR_LIB) $(ENGINE_LIB)
+	$(CXX) $(TEST_OBJ) $(EDITOR_LIB) $(ENGINE_LIB) $(LDFLAGS_ALL) -o $@
 
 test: $(TEST_BIN)
 	$(TEST_BIN)
@@ -96,4 +103,4 @@ clean:
 help:
 	@sed -n '2,16p' Makefile
 
--include $(ENGINE_OBJ:.o=.d) $(CLI_OBJ:.o=.d) $(TEST_OBJ:.o=.d)
+-include $(ENGINE_OBJ:.o=.d) $(EDITOR_OBJ:.o=.d) $(CLI_OBJ:.o=.d) $(TEST_OBJ:.o=.d)

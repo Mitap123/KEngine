@@ -47,13 +47,20 @@ add_library(kengine_core STATIC ${KENGINE_ENGINE_SOURCES})
 target_include_directories(kengine_core PUBLIC "${CMAKE_SOURCE_DIR}")
 kengine_apply_flags(kengine_core)
 
+# Qt-free editor logic (document, selection, explorer/inspector models, play demo, camera framing).
+file(GLOB KENGINE_EDITOR_CORE_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/Editor/Core/*.cpp")
+add_library(kengine_editor_core STATIC ${KENGINE_EDITOR_CORE_SOURCES})
+target_include_directories(kengine_editor_core PUBLIC "${CMAKE_SOURCE_DIR}")
+target_link_libraries(kengine_editor_core PUBLIC kengine_core)
+kengine_apply_flags(kengine_editor_core)
+
 add_executable(k "${CMAKE_SOURCE_DIR}/Tools/CLI/main.cpp")
 target_link_libraries(k PRIVATE kengine_core)
 kengine_apply_flags(k)
 
 file(GLOB KENGINE_UNIT_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/Tests/Unit/*.cpp")
 add_executable(k_unit_tests ${KENGINE_UNIT_TEST_SOURCES})
-target_link_libraries(k_unit_tests PRIVATE kengine_core)
+target_link_libraries(k_unit_tests PRIVATE kengine_editor_core kengine_core)
 kengine_apply_flags(k_unit_tests)
 
 enable_testing()
