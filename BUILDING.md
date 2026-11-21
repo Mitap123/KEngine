@@ -27,11 +27,9 @@ ctest --test-dir Build/cmake --output-on-failure
 ```
 Record the outcome (date, cmake version, result) here when it is run. Until then treat it as unverified. See ADR-0009.
 
-## Windows (owner's machine) — UNVERIFIED
-The portable part is expected to build with MSVC (`/Zc:__cplusplus /utf-8 /permissive-` are set by CMake) or MinGW-w64, but this has never been tried. Follow `Editor/Spike/README.md`: Step 0 is `cmake` configure/build + `ctest` for the portable code (the first real run of `CMakeLists.txt`), then the GPU probe and the viewport spike (`-DKENGINE_BUILD_EDITOR_SPIKE=ON`, Windows only). Record results here.
-
-## Not buildable / not existing yet
-The Qt Editor shell, Runtime, Python/C++/Rust SDKs do not exist. The Direct3D 11 viewport spike exists but has never been compiled.
+## Windows 10 / 11 (x64) — first verified run 2026-11-19
+Environment that worked for the owner: Windows 10 Pro 19045, Visual Studio Build Tools (MSVC 19.51.36260.0, generator "Visual Studio 18 2026"), Windows SDK 10.0.22000.0, Qt 6.12.0 `msvc2022_64`, CMake, Python 3 on PATH. CMake sets `/Zc:__cplusplus /utf-8 /permissive-` for MSVC. Follow `Editor/Spike/README.md` (Steps 0-3; the Debug exes are in `Build\cmake\Editor\Spike\Debug`).
+Observed: configure and build succeeded for the portable code, `k_gpu_probe` and `k_viewport_spike`; `ctest`: `cli` passed, `unit` 134/135 before the fix to the Windows scene-file path (expected 135/135 now: rerun needed). Not tried: Release configuration, MinGW, Ninja, Windows 11.
 
 ## Platform coverage
-Only Linux x86_64 + GCC 13.3 has been built and tested. The scene file code has an untested non-POSIX fallback (no fsync); Windows/macOS/Clang are unverified.
+Tested: Linux x86_64 + GCC 13.3 (all unit/CLI tests, sanitizers) and Windows 10 + MSVC 19.51 (build, CLI tests, 134/135 unit tests before the scene-file fix). Not tested: Windows 11, MinGW, Clang, macOS. The generic non-POSIX, non-Windows scene-file fallback is unverified.

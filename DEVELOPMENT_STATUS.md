@@ -1,6 +1,6 @@
 # Development status (handoff)
 
-**Date:** 2026-11-19 · **Milestone:** M0 in progress; M0.5 engine side essentially complete (identity, scene, files, rendering support, undo/redo, Play isolation, CLI); Editor shell and viewport awaiting owner verification · **Branch:** `main`
+**Date:** 2026-11-19 · **Milestone:** M0 nearly complete; M0.5 engine side complete; first hardware run done (viewport renders on the target GPU, two defects found and fixed, re-verification pending); Editor shell not started · **Branch:** `main`
 
 ## Summary
 New project (no pre-existing repository). Session 1 established the control documents, ADRs, a verified build/test route, a minimal CLI, and the first M0.5 engine slice (identity, authoring scene, strict JSON, scene serialization). Session 2 added scene **file** save/load (atomic, with backup and bounded, validated load). The Qt Editor, renderer and everything GUI-related remains **blocked by the environment**, not started.
@@ -19,6 +19,18 @@ New project (no pre-existing repository). Session 1 established the control docu
 | Profilers | not investigated |
 
 Consequence: CMake/Qt/Rust/GPU work cannot be built or verified here. Work that does not need them proceeded.
+
+## Session 6 (2026-11-19): first run on the owner's machine
+**Environment reported:** Windows 10 Pro 19045; Intel Core i5-560M; Intel HD Graphics (0x8086:0x0046), driver 8.15.10.2900 (2012-11-26), 64 MB dedicated + 1632 MB shared; MSVC 19.51.36260.0 (VS Build Tools), Windows SDK 10.0.22000.0, Qt 6.12.0 `msvc2022_64`.
+**What the run proved:** the CMake route and the whole Windows layer built on the first attempt; `cli` ctest passed; `k_viewport_spike --screenshot` (also with `--no-warp`) created a **hardware** device, rendered, wrote a PNG and exited 0.
+**What it refuted / found:**
+1. **Hardware floor is Direct3D feature level 10_0, not 10_1.** `k_gpu_probe`: the adapter was granted 10_0 when 11_0/10_1/10_0 were requested (the software "Microsoft Basic Render Driver" and WARP reach 11_0). The owner's "DX 10.1" requirement is still met (the engine runs on this machine) by targeting the lower floor; ADR-0004, AGENTS.md and the matrices were corrected. The shaders were already Shader Model 4.0, which is why it ran.
+2. **All surfaces rendered black.** Cause: the pixel shader reads `color` from the `Object` constant buffer but only `VSSetConstantBuffers` was called. Fixed with `PSSetConstantBuffers(1, ...)`. My stub-level syntax check could not catch this (it is behaviour, not syntax).
+3. **`unit` 134/135 on Windows:** `scene_file_failure_at_any_stage...` expected `file.sync_failed`, got `file.write_failed`. The Windows build was using my *generic* fallback (ofstream, no fsync, wrong error mapping for the injected sync failure). I replaced it with a real Windows path: `CreateFileW(CREATE_NEW)` + `WriteFile` + `FlushFileBuffers` + `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)`, and made path text UTF-8 (`path.string()` goes through the ANSI code page on Windows and mangles non-ASCII names). Checked here only by a syntax check of a forced-Windows copy against stubs (with a negative control); behaviour on Windows is **unverified until the owner reruns**.
+**Added:** a visual probe: `Tests/Visual/png_probe.py` (pure-stdlib PNG reader + black/lit pixel analysis; decoder cross-checked against PIL's independent encoder on 18 images), 8 self-tests (`make visual-selftest`, ctest `png_probe`), and ctest `viewport_screenshot` that runs the exe and fails on black surfaces (not yet run by the owner). The first hardware run's bug is exactly what it would have caught.
+**Not reported by the owner (unknown):** interactive controls (orbit/pan/zoom/click-select/resize) and the lit appearance after the fix. The report template's blanks for label/controls/driver were left as `___` except what the console showed. Frame times observed: ~2-12 ms, 28-38 ms on the capture frame (GPU read-back); not investigated.
+**Verification (Linux, after these changes):** `make STRICT=1 check`, `make SANITIZE=1 STRICT=1 check`, `make BUILD_TYPE=Release STRICT=1 check` all exit 0 with unit 135/135, CLI 21 OK, visual self-tests 8 OK; no sanitizer reports.
+**Own mistakes this session:** assumed 10_1 hardware from recollection (wrong); an unbound constant buffer; an untested generic fallback shipped as the Windows save path; an attempt to syntax-check the Windows branch with `-D_WIN32` broke libstdc++ itself, so I used a forced-platform copy instead.
 
 ## Session 5 (2026-11-19): hostile-input hardening (M05-T10)
 **Method:** measured pathological scene files before changing anything. Findings (release build): a 40,000-object parent chain took 7.3 s to load (per-object cycle check, O(n²)); a JSON object with 200,000 keys took 140 s (linear duplicate-key scans, O(n²)); 60,000 unknown fields produced 60,000 stored and printed warnings; peak memory is ~15× file size (274 MiB for 17.7 MiB). A 64 MiB file (the default read cap) could therefore have hung the loader for hours.
@@ -110,8 +122,10 @@ CMake configure/build/ctest (no cmake); any Qt/GUI/viewport/screenshot test; int
 3. Is a non-Windows Editor/viewport ever required? (It would need a second renderer backend behind `DrawList`.)
 
 ## Next task (exact)
-**Still M05-T03b (owner action): run the spike on the i5-560M machine** (Windows 10/11). Follow `Editor/Spike/README.md` Steps 0-3 and send back: `ctest` output (also the first real run of `CMakeLists.txt`), the full `k_gpu_probe` output, the viewport output/exit codes (including `--screenshot out.png --no-warp`), `out.png`, and Windows build / GPU driver / Qt kit / compiler versions. Expect possible small compile fixes in the Windows-only files; paste compiler output verbatim.
-Why it is still first: the Editor shell (M05-T01) and viewport integration (M05-T03/T04) would be built on a renderer that has never run, with ADR-0004 resting on unverified hardware facts. The Qt-free engine side of M0.5 is now complete, so there is little left that can be done safely without that evidence.
-
-**What I can still do without the owner's machine (smaller value):** M05-T08 remainder (structured log file option; project-level validation once a manifest exists), composite commands (duplicate/paste) on top of `CommandHistory`, a project manifest + `k create` skeleton (needs the ADR-0006 manifest decision: JSON vs TOML), fuzzing the JSON/scene parser. Say which, or send the spike results.
-**After the spike passes:** M05-T01 (Qt Widgets shell: Explorer, Inspector, Console, Viewport docks) wired to `SceneEditor`, then M05-T04 (selection + transform editing UI), then M05-T09 (Hello Cube acceptance run).
+**Owner: rebuild and re-verify (M05-T03b), about 5 minutes.** Pull this version, then:
+```
+cmake --build Build/cmake --config Debug
+ctest --test-dir Build/cmake -C Debug --output-on-failure
+```
+Expect **4/4 tests**: `unit` (135/135, including the Windows save path), `cli`, `png_probe`, and `viewport_screenshot` (needs Qt's `bin` on PATH or `windeployqt`; it fails if surfaces are black). Then run `k_viewport_spike.exe` by hand and tell me, one line each: lit light-blue shapes (not black)? orbit (left drag)? pan (right drag / Shift+left drag)? zoom (wheel)? click selects (turns orange, label names it)? click empty space clears? resize/maximize keeps rendering? And paste any failing test output verbatim.
+**Then (me): M05-T01, the Qt Widgets Editor shell** (Explorer tree, Inspector with name + position/rotation/scale, Console, Viewport dock) wired to `SceneEditor`, File New/Open/Save, Edit Undo/Redo, Play/Stop buttons; followed by M05-T04 (selection + transform editing) and M05-T09 (Hello Cube acceptance run). The Qt-free engine side is complete, so this is the critical path. Optional meanwhile: composite commands, project manifest + `k create` (needs the JSON-vs-TOML decision), smaller JSON nodes (memory ~15x file size).

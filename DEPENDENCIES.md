@@ -11,6 +11,9 @@ Rule: verify license details from authoritative project/license files; never gue
 | GNU make | 4.3 | bootstrap build | GPL (toolchain, not redistributed; **UNVERIFIED**) | required (dev, bootstrap route) |
 | Python | 3.12.3 | CLI tests only (`unittest`, stdlib) | PSF (**UNVERIFIED**) | required for `make cli-test` |
 | git | 2.43.0 | version control | GPLv2 (**UNVERIFIED**) | dev |
+| MSVC (Visual Studio Build Tools) | 19.51.36260.0 (owner's machine) | Windows compiler | Microsoft terms, **UNVERIFIED** | dev |
+| Windows SDK | 10.0.22000.0 (owner's machine) | Direct3D 11 / DXGI / D3DCompiler headers and libs | Microsoft terms, **UNVERIFIED** | Editor/Spike |
+| Qt 6 Widgets | 6.12.0 `msvc2022_64` (owner's machine) | Editor/Spike window | LGPLv3/GPLv3/commercial, **UNVERIFIED** (ADR-0005) | Editor-only |
 
 No third-party library is linked into `Engine/`, `k` or the tests. The JSON parser and the test harness are in-repo code (ADR-0006, ADR-0009).
 

@@ -14,16 +14,19 @@ Statuses: PLANNED, PROTOTYPE, IMPLEMENTED, TESTED, STABLE, BLOCKED. Each status 
 | Scene file I/O on non-POSIX platforms (fallback code path) | PROTOTYPE | compiled only when not POSIX; never built or run |
 | CLI `k --version`, `--help`, `doctor [--json]` | TESTED | `Tests/CLI/test_cli.py` |
 | Make build (Debug/Release/ASan+UBSan, strict warnings) | TESTED | `make check` variants |
-| CMake build | PROTOTYPE | written, never executed (no cmake available) |
+| CMake build on Windows 10 (MSVC 19.51, Qt 6.12) | IMPLEMENTED | owner ran it 2026-11-19: configure + build OK, `cli` test passed, `unit` 134/135 (one Windows-path bug, fixed, awaiting rerun). Not TESTED until the rerun is 2/2. Not tried with MinGW/Ninja/Release |
 | CI workflow | PLANNED | M0-T06 |
 | Project creation / manifest | PLANNED | |
 | Domain-typed handles (`ObjectHandle`; cross-domain use is a compile error) | TESTED | `static_assert`s in `test_handle.cpp`, compile-fail check |
 | Math (Mat4/Vec3), scene local/world transforms | TESTED | `test_math.cpp`, `test_rendering_geometry.cpp` (incl. depth-100,000 chains) |
 | Primitive meshes (cube/sphere/plane), orbit camera, screen rays, CPU picking, DrawList | TESTED | `test_rendering_geometry.cpp`, `test_camera_picking.cpp`; 12 mutation checks |
-| Direct3D 11 renderer (feature level 10_1 target), GPU probe | PROTOTYPE | written, **never compiled/run**; stub-level syntax check only |
-| Qt viewport widget + spike app (orbit/pan/zoom/select/screenshot) | PROTOTYPE | written, **never compiled/run** |
+| `k_gpu_probe` (adapter / feature-level report) | TESTED | owner ran it: Intel HD Graphics 0x8086:0x0046 -> feature level **10_0**; WARP and Basic Render Driver 11_0 |
+| Direct3D 11 renderer, feature level 10_0 floor (hardware device, SM 4.0 shaders, back-buffer capture) | IMPLEMENTED | runs on the target GPU with `--no-warp`, exit 0, PNG written, geometry/silhouettes correct; first run showed all-black surfaces (PS constant buffer unbound) - **fixed, not yet re-verified**; frame times ~2-12 ms (capture frame 28-38 ms) |
+| Qt viewport widget + spike app: window, init, render, `--screenshot`, `--no-warp` | IMPLEMENTED | observed on the owner's machine (console output, exit 0, PNG) |
+| Spike interactive controls (orbit/pan/zoom/click-select/resize) | PROTOTYPE | compiled, **behaviour not reported yet** |
 | Qt Editor shell (docks, explorer, inspector) | BLOCKED | needs the owner's Windows/Qt machine; not started |
-| Viewport verified on the target GPU (i5-560M iGPU, D3D 10.1) | BLOCKED | waiting for the owner to run `k_gpu_probe` / `k_viewport_spike` |
+| Viewport verified on the target GPU (i5-560M iGPU, FL 10_0) | IMPLEMENTED | renders on the real GPU; lit shading and interaction awaiting the owner's re-verification |
+| Windows scene-file save path (CreateFileW + FlushFileBuffers + MoveFileExW) | PROTOTYPE | replaces the generic fallback that failed one Windows test; compiled/run result pending the owner's rerun |
 | Selection sync, transform editing UI | BLOCKED | depends on Editor shell |
 | Undo/redo for create/delete(subtree)/transform/rename/reparent, merge of drags, dirty tracking (`SceneEditor`, Qt-free) | TESTED | `test_commands.cpp` incl. randomized snapshot-model check; 14+ mutation checks. No UI yet |
 | Play/Stop isolation (value copy of the authoring scene; edits/undo blocked while playing) | TESTED | `test_commands.cpp` (`play_*`, 500 repeated sessions). Engine-side only: no runtime loop, no Editor buttons yet |

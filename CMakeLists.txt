@@ -64,8 +64,10 @@ if(Python3_Interpreter_FOUND)
   add_test(NAME cli
            COMMAND ${CMAKE_COMMAND} -E env "KENGINE_CLI=$<TARGET_FILE:k>"
                    ${Python3_EXECUTABLE} -m unittest discover -s "${CMAKE_SOURCE_DIR}/Tests/CLI" -v)
+  add_test(NAME png_probe
+           COMMAND ${Python3_EXECUTABLE} -m unittest discover -s "${CMAKE_SOURCE_DIR}/Tests/Visual" -p test_png_probe.py -v)
 else()
-  message(WARNING "Python 3 not found: the CLI tests are NOT registered (reported as not-run, not as passed).")
+  message(WARNING "Python 3 not found: the CLI and PNG-probe tests are NOT registered (reported as not-run, not as passed).")
 endif()
 
 if(KENGINE_BUILD_EDITOR_SPIKE)

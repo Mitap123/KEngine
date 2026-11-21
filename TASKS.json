@@ -226,7 +226,7 @@
             "Full command palette and theme system"
           ],
           "evidence": [],
-          "notes": "Unblocked in principle: the owner has Qt 6 + CMake on Windows. Not started; do it after the spike results (M05-T03b) so the Editor shell is built on a verified viewport path. Use Qt Widgets only (ADR-0004)."
+          "notes": "Unblocked: the Windows toolchain (MSVC 19.51, Qt 6.12, CMake) builds this repo and the viewport renders on the target GPU. Start after the owner confirms the re-verification of M05-T03b (lit shading, interactive controls). Qt Widgets only (ADR-0004)."
         },
         {
           "id": "M05-T02",
@@ -335,7 +335,7 @@
         {
           "id": "M05-T03b",
           "title": "Verify the Direct3D 11 (feature level 10_1) viewport spike on the target hardware",
-          "status": "blocked",
+          "status": "partial",
           "priority": "P0",
           "depends_on": [
             "M05-T03a"
@@ -353,7 +353,10 @@
             "Follow Editor/Spike/README.md steps 0-3 on the owner's machine"
           ],
           "verification_commands": [],
-          "notes": "BLOCKED on the owner running the spike (code is unverified). Cannot be done in the Linux sandbox."
+          "notes": "Owner ran steps 0-3: everything built; hardware device at feature level 10_0 (NOT 10_1); screenshot written, exit 0, no WARP. Defects found: black surfaces (PS constant buffer unbound -> fixed) and a Windows scene-file test failure (fallback sync mapping -> fixed with a real Win32 save path). Remaining: rerun after the fixes (expect ctest 2/2, lit shapes), report interactive controls (orbit/pan/zoom/select/resize) and the label.",
+          "evidence": [
+            "Owner run 2026-11-19 (see DEVELOPMENT_STATUS.md, ADR-0004 \"Measured results\")"
+          ]
         },
         {
           "id": "M05-T03",

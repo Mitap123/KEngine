@@ -310,6 +310,9 @@ Status D3D11Renderer::render(const std::vector<DrawItem>& items, const Mat4& vie
     if (!s.update_cb(s.frame_cb.get(), fcb)) return make_error("d3d11.map_failed", "cannot update frame constant buffer");
     ID3D11Buffer* cbs[2] = {s.frame_cb.get(), s.object_cb.get()};
     s.context->VSSetConstantBuffers(0, 2, cbs);
+    // The pixel shader reads `color` from the Object buffer (b1): bind it to the PS stage as well,
+    // otherwise the shader sees zeros and every object renders black (found on real hardware).
+    s.context->PSSetConstantBuffers(1, 1, &cbs[1]);
 
     for (const DrawItem& item : items) {
         const GpuMesh* mesh = item.kind == ObjectKind::Cube ? &s.cube : item.kind == ObjectKind::Sphere ? &s.sphere

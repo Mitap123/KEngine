@@ -17,9 +17,13 @@
 // Policy: refuses to save over a non-regular file or a symlink (replacing a
 // symlink with a regular file would silently break the user's link).
 //
-// Platform note: only the POSIX path has been built and tested (Linux/GCC).
-// Other platforms fall back to ofstream + std::filesystem::rename without
-// fsync; that fallback is UNVERIFIED and gives weaker durability guarantees.
+// Platform notes: POSIX (Linux/GCC) is covered by unit tests here. On Windows the
+// same sequence uses CreateFileW(CREATE_NEW) / WriteFile / FlushFileBuffers and
+// MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH) (there is no directory fsync); this
+// path was first compiled and run on Windows 10 (MSVC) by the project owner, where
+// the generic ofstream fallback it replaced failed one test (sync error mapping).
+// Any other platform uses an ofstream + std::filesystem::rename fallback without
+// fsync: UNVERIFIED, weaker durability.
 //
 // LOAD reads at most `max_bytes`, refuses non-regular files (so a FIFO or
 // device cannot block or flood memory), and prefixes parse/validation errors

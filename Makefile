@@ -54,7 +54,7 @@ ENGINE_LIB := $(BUILD_DIR)/libkengine_core.a
 CLI_BIN    := $(BUILD_DIR)/k
 TEST_BIN   := $(BUILD_DIR)/k_unit_tests
 
-.PHONY: all check test cli-test clean help
+.PHONY: all check test cli-test visual-selftest clean help
 all: $(CLI_BIN) $(TEST_BIN)
 
 $(BUILD_DIR)/%.o: %.cpp
@@ -77,7 +77,11 @@ test: $(TEST_BIN)
 cli-test: $(CLI_BIN)
 	KENGINE_CLI=$(abspath $(CLI_BIN)) python3 -m unittest discover -s Tests/CLI -v
 
-check: test cli-test
+# Self-tests of the screenshot analysis (synthetic PNGs; no GPU, no exe).
+visual-selftest:
+	python3 -m unittest discover -s Tests/Visual -p test_png_probe.py -v
+
+check: test cli-test visual-selftest
 
 clean:
 	rm -rf Build

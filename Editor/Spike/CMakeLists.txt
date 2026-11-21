@@ -23,6 +23,16 @@ if(Qt6_FOUND)
   set_target_properties(k_viewport_spike PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
   target_include_directories(k_viewport_spike PRIVATE "${CMAKE_SOURCE_DIR}")
   target_link_libraries(k_viewport_spike PRIVATE kengine_core Qt6::Widgets d3d11 dxgi ${KENGINE_D3DCOMPILER_LIB})
+
+  # Visual probe: runs the exe, decodes the PNG it writes and fails if surfaces are black.
+  # Qt's DLLs must be findable (PATH or windeployqt). Needs a GPU or WARP.
+  find_package(Python3 COMPONENTS Interpreter)
+  if(Python3_Interpreter_FOUND)
+    add_test(NAME viewport_screenshot
+             COMMAND ${CMAKE_COMMAND} -E env "KENGINE_VIEWPORT_SPIKE=$<TARGET_FILE:k_viewport_spike>"
+                     ${Python3_EXECUTABLE} -m unittest discover -s "${CMAKE_SOURCE_DIR}/Tests/Visual" -p test_viewport_screenshot.py -v)
+    set_tests_properties(viewport_screenshot PROPERTIES TIMEOUT 120)
+  endif()
 else()
   message(WARNING "Qt6 Widgets not found: only k_gpu_probe will be built. Set CMAKE_PREFIX_PATH to your Qt 6 kit.")
 endif()

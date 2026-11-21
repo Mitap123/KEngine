@@ -53,10 +53,10 @@ CMake is written but UNVERIFIED (no cmake in the original dev environment); see 
 
 ## Hardware floor and platform rules
 - **Supported platforms (owner decision): Windows 10 and Windows 11, x64.** Linux is used only as a convenient environment for the portable, Qt-free core and its tests; it is not a product platform. K Engine's own license is deliberately undecided (deferred): do not add a LICENSE file.
-- Target hardware floor (owner requirement): **Direct3D 10.1** class GPU (Intel Core i5-560M iGPU). Renderer: Direct3D 11 API at feature level 10_1 (ADR-0004). Shaders Shader Model 4.0 only; no compute/tessellation/MSAA by default; render on demand.
+- Target hardware floor (owner requirement: Direct3D 10.1-class GPU). **Measured** on the owner's Intel HD Graphics (i5-560M, driver 2012): Direct3D feature level **10_0**, not 10_1. Renderer: Direct3D 11 API at feature level 10_0 (ADR-0004). Shaders are Shader Model 4.0 only; never require 4.1/10.1 features; no compute/tessellation/MSAA by default; render on demand.
 - `Engine/*` is portable and API-neutral; renderers consume only `DrawList`. Only `Editor/` may use Windows/Direct3D/Qt. Use Qt **Widgets** only (no Qt Quick/QRhi/QOpenGLWidget).
 - Math/coordinate conventions are fixed by ADR-0010 (right-handed, +Y up, row-major `Mat4`, column vectors, Euler `Ry*Rx*Rz`, local transforms, CCW front faces, depth [0,1]). Do not change them without an ADR and a schema bump.
-- Windows/Direct3D/Qt code in this repo is UNVERIFIED until the owner runs it; never describe it as working.
+- Windows/Direct3D/Qt code compiles and runs on the owner's machine (MSVC, Qt 6.12, Windows 10) but only what the owner has reported is verified: say exactly which behaviours were observed. Stub-level syntax checks do NOT verify behaviour (they missed an unbound shader constant buffer).
 
 ## Known open risks (details in ADRs)
 - Handles are domain-typed, but two scenes share a handle type (ADR-0003): use UUIDs across scenes.

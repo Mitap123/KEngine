@@ -1,6 +1,6 @@
-# Viewport spike (Direct3D 11, feature level 10_1) — UNVERIFIED
+# Viewport spike (Direct3D 11, feature level 10_0 floor)
 
-**Status:** none of the Windows/Direct3D/Qt code here has ever been compiled or run. It was written without a Windows toolchain and checked only for C++ syntax against hand-written stub headers (which cannot validate Direct3D API usage). Expect that the first build may need small fixes; please send the compiler output if so. Decision record: `Documentation/ADR/0004-renderer-and-qt-integration.md`.
+**Status (2026-11-19):** compiled and run on the owner's Windows 10 / Intel HD Graphics (device 0x0046, feature level **10_0**) / Qt 6.12 / MSVC 19.51 machine: hardware device created, frames rendered, screenshot written, exit code 0. First run found a black-shading bug (pixel shader constant buffer not bound), now fixed but **not yet re-verified**; interactive controls are still unreported. Decision record: `Documentation/ADR/0004-renderer-and-qt-integration.md`.
 
 ## What is here
 | Target | Needs | Purpose |
@@ -27,7 +27,7 @@ Build\cmake\Editor\Spike\Debug\k_gpu_probe.exe
 ```
 (`CMAKE_PREFIX_PATH` may be omitted for this step; without Qt only the probe is built, with a warning. Single-config generators such as Ninja or MinGW put the exe in `Build\cmake\Editor\Spike\`.)
 
-**Please report the full output.** Expected on the i5-560M, *if my recollection is right*: one Intel HD Graphics adapter, "Direct3D 11 device: yes, feature level 10_1". If it says 10_0, 9_x, or only WARP works, ADR-0004 must change.
+**Measured on the owner's i5-560M machine:** Intel HD Graphics (0x8086:0x0046) reaches feature level **10_0** (not 10_1); the Microsoft Basic Render Driver and WARP reach 11_0. The engine's floor is therefore 10_0.
 
 ## Step 2 — viewport
 ```
@@ -44,6 +44,12 @@ Check: you see the shapes; the label shows adapter, feature level, driver (`hard
 k_viewport_spike.exe --screenshot out.png
 ```
 Exit code 0 and a non-blank `out.png`. Exit 2 = GPU initialization failed, 1 = screenshot could not be saved, 3 = timed out. `--no-warp` makes it fail instead of silently using the software rasterizer (use it to be sure you are testing the real GPU).
+
+## Re-verification after the shading fix (please do this next)
+Rebuild and run again (`cmake --build Build/cmake --config Debug --target k_viewport_spike`, then `ctest --test-dir Build/cmake -C Debug --output-on-failure` — expect **2/2 pass**, unit 135/135). Then report:
+1. Does `out.png` now show **lit, light-blue** shapes (not black) with the cube/sphere shaded by a light from the upper right?
+2. Interactive checks in the window, one line each: orbit (left drag), pan (right drag or Shift+left drag), zoom (wheel), click selects (turns **orange**, label names it), click empty space clears, resizing/maximizing keeps rendering. Which work and which do not?
+3. The label text shown in the window.
 
 ## What to send back
 1. Output of Step 0's `ctest` (or the first error).

@@ -11,6 +11,15 @@
 #define KENGINE_POSIX_IO 1
 #include <fcntl.h>
 #include <unistd.h>
+#elif defined(_WIN32)
+#define KENGINE_WIN32_IO 1
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #endif
 
 namespace fs = std::filesystem;
@@ -21,8 +30,19 @@ namespace {
 
 std::string errno_message(int e) { return std::generic_category().message(e); }
 
+// UTF-8 text of a path. path.string() would go through the ANSI code page on
+// Windows and mangle (or throw on) names with non-ASCII characters.
+std::string path_text(const fs::path& p) {
+    const auto u = p.u8string();
+    return std::string(reinterpret_cast<const char*>(u.data()), u.size());
+}
+
+std::u8string utf8_from(const std::string& s) {
+    return std::u8string(reinterpret_cast<const char8_t*>(s.data()), s.size());
+}
+
 Error file_error(const char* code, const fs::path& path, const std::string& what) {
-    return make_error(code, path.string() + ": " + what);
+    return make_error(code, path_text(path) + ": " + what);
 }
 
 // -------------------------------------------------------------- writing ---
@@ -84,15 +104,61 @@ Status write_temp_file(const fs::path& tmp, const std::string& data, const SaveO
         return file_error("file.write_failed", tmp, "close failed: " + errno_message(e));
     }
     return Status::success();
+#elif defined(KENGINE_WIN32_IO)
+    auto win_message = [](DWORD e) { return std::system_category().message(static_cast<int>(e)); };
+    if (inject("create_temp")) return file_error("file.temp_create_failed", tmp, "injected failure");
+    // CREATE_NEW never clobbers an existing file; share mode 0 keeps other processes out while we write.
+    HANDLE h = ::CreateFileW(tmp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) {
+        const DWORD e = ::GetLastError();
+        if ((e == ERROR_FILE_EXISTS || e == ERROR_ALREADY_EXISTS) && name_collision) *name_collision = true;
+        return file_error("file.temp_create_failed", tmp, "cannot create temporary file: " + win_message(e));
+    }
+    bool ok = !inject("write");
+    DWORD err = ok ? 0 : ERROR_WRITE_FAULT;
+    const char* p = data.data();
+    std::size_t left = data.size();
+    while (ok && left > 0) {
+        const DWORD chunk = static_cast<DWORD>(left > 0x40000000u ? 0x40000000u : left);
+        DWORD written = 0;
+        if (!::WriteFile(h, p, chunk, &written, nullptr) || written == 0) {
+            ok = false;
+            err = ::GetLastError();
+            if (err == 0) err = ERROR_WRITE_FAULT;
+            break;
+        }
+        p += written;
+        left -= written;
+    }
+    if (!ok) {
+        ::CloseHandle(h);
+        cleanup();
+        return file_error("file.write_failed", tmp, "write failed: " + win_message(err));
+    }
+    DWORD sync_err = 0;
+    if (inject("sync")) sync_err = ERROR_WRITE_FAULT;
+    else if (!::FlushFileBuffers(h)) sync_err = ::GetLastError();
+    if (sync_err != 0) {
+        ::CloseHandle(h);
+        cleanup();
+        return file_error("file.sync_failed", tmp, "flush failed: " + win_message(sync_err));
+    }
+    if (!::CloseHandle(h)) {
+        const DWORD e = ::GetLastError();
+        cleanup();
+        return file_error("file.write_failed", tmp, "close failed: " + win_message(e));
+    }
+    return Status::success();
 #else
-    // UNVERIFIED fallback: no fsync, weaker durability.
+    // UNVERIFIED generic fallback (neither POSIX nor Windows): no fsync, weaker durability.
     if (inject("create_temp")) return file_error("file.temp_create_failed", tmp, "injected failure");
     std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
     if (!out) return file_error("file.temp_create_failed", tmp, "cannot create temporary file");
     if (inject("write")) { out.close(); cleanup(); return file_error("file.write_failed", tmp, "injected failure"); }
     out.write(data.data(), static_cast<std::streamsize>(data.size()));
     out.flush();
-    if (!out || inject("sync")) { out.close(); cleanup(); return file_error("file.write_failed", tmp, "write failed"); }
+    if (!out) { out.close(); cleanup(); return file_error("file.write_failed", tmp, "write failed"); }
+    if (inject("sync")) { out.close(); cleanup(); return file_error("file.sync_failed", tmp, "injected failure"); }
     return Status::success();
 #endif
 }
@@ -144,7 +210,7 @@ Status save_scene_file(const Scene& scene, const fs::path& path, const SaveOptio
     Status written = Status::success();
     // Unique temporary name in the same directory (same filesystem => rename is atomic).
     for (int attempt = 0; attempt < 8; ++attempt) {
-        tmp = dir / ("." + path.filename().string() + "." + Uuid::generate().to_string().substr(0, 8) + ".tmp");
+        tmp = dir / fs::path(u8"." + path.filename().u8string() + u8"." + utf8_from(Uuid::generate().to_string().substr(0, 8)) + u8".tmp");
         bool collision = false;
         written = write_temp_file(tmp, text.value(), options, &collision);
         if (!collision) break;  // success, or a failure that a new name cannot fix
@@ -172,8 +238,13 @@ Status save_scene_file(const Scene& scene, const fs::path& path, const SaveOptio
     if (inject("rename")) {
         rec = std::make_error_code(std::errc::io_error);
     } else {
-#ifdef KENGINE_POSIX_IO
+#if defined(KENGINE_POSIX_IO)
         if (::rename(tmp.c_str(), path.c_str()) != 0) rec = std::error_code(errno, std::generic_category());
+#elif defined(KENGINE_WIN32_IO)
+        // Atomically replaces an existing file; WRITE_THROUGH returns only after the move reaches the disk.
+        if (!::MoveFileExW(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+            rec = std::error_code(static_cast<int>(::GetLastError()), std::system_category());
+        }
 #else
         fs::rename(tmp, path, rec);
 #endif
