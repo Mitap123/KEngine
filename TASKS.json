@@ -171,7 +171,7 @@
         {
           "id": "M0-T06",
           "title": "Add initial CI smoke workflow",
-          "status": "pending",
+          "status": "partial",
           "priority": "P1",
           "depends_on": [
             "M0-T04"
@@ -192,7 +192,9 @@
           "verification_commands": [],
           "out_of_scope": [
             "Full cross-platform release matrix"
-          ]
+          ],
+          "evidence": "2026-11-23: .github/workflows/ci.yml written (linux-core: make debug/asan+ubsan/release, all STRICT=1; windows-core: cmake + MSVC build + ctest, no Qt; logs uploaded as artifacts). YAML parses (PyYAML). Equivalent local commands run on Linux: all three make configurations exit 0 (unit 152/152, CLI 21, visual 8).",
+          "notes": "NOT yet run on GitHub: no run URL exists, so 'CI configures and builds' and 'failure output retained' are unverified there. Windows job is unverified (default CMake generator on windows-2022 untested). Editor/Qt and the D3D spike are not built in CI. Close this task after the first green run is recorded in BUILDING.md."
         }
       ]
     },

@@ -34,5 +34,8 @@ Observed: configure and build succeeded for the portable code, `k_gpu_probe` and
 ## Editor (`k_editor`) — first compile pending
 `-DKENGINE_BUILD_EDITOR=ON` (Windows only) builds `Editor/App`; see `Editor/App/README.md` for the exact commands, the new ctest tests (`editor_smoke`, `editor_screenshot`) and what to report. `make check-full` / `-DKENGINE_FULL_TESTS=ON` run the full-size unit tests.
 
+## CI
+`.github/workflows/ci.yml` (M0-T06): Linux jobs run the verified `make` routes; the Windows job runs the CMake route without Qt. **Written, not yet run on GitHub.** After the first run, record here: date, run URL, per-job result.
+
 ## Platform coverage
 Tested: Linux x86_64 + GCC 13.3 (all unit/CLI tests, sanitizers) and Windows 10 + MSVC 19.51 (build, CLI tests, 134/135 unit tests before the scene-file fix). Not tested: Windows 11, MinGW, Clang, macOS. The generic non-POSIX, non-Windows scene-file fallback is unverified.

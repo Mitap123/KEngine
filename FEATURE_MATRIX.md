@@ -15,7 +15,7 @@ Statuses: PLANNED, PROTOTYPE, IMPLEMENTED, TESTED, STABLE, BLOCKED. Each status 
 | CLI `k --version`, `--help`, `doctor [--json]` | TESTED | `Tests/CLI/test_cli.py` |
 | Make build (Debug/Release/ASan+UBSan, strict warnings) | TESTED | `make check` variants |
 | CMake build on Windows 10 (MSVC 19.51, Qt 6.12) | TESTED | owner: build 0 errors/0 warnings; ctest 4/4 (unit 135/135, cli, png_probe, viewport_screenshot). Not tried: MinGW, Ninja, Release, Windows 11 |
-| CI workflow | PLANNED | M0-T06 |
+| CI workflow | WRITTEN, NOT RUN on GitHub (Linux make x3 + Windows cmake/MSVC, no Qt) | M0-T06 |
 | Project creation / manifest | PLANNED | |
 | Domain-typed handles (`ObjectHandle`; cross-domain use is a compile error) | TESTED | `static_assert`s in `test_handle.cpp`, compile-fail check |
 | Math (Mat4/Vec3), scene local/world transforms | TESTED | `test_math.cpp`, `test_rendering_geometry.cpp` (incl. depth-100,000 chains) |

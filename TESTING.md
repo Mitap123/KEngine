@@ -20,7 +20,9 @@ Filter unit cases: `Build/make-debug/k_unit_tests <substring>`; list: `--list`.
 | Editor UI smoke (Windows) | ctest `editor_smoke` (`k_editor --smoke`) | `-DKENGINE_BUILD_EDITOR=ON` | drives the real widgets through the workflow. **Not yet run** |
 
 ## Layers that do NOT exist yet
-Integration (Editor workflows), GUI interaction, determinism, performance/benchmarks, fuzzing (JSON/scene parsers are good first targets), coverage, CI. Nothing in these layers has been run; none is claimed.
+Integration (Editor workflows), GUI interaction, determinism, performance/benchmarks, fuzzing (JSON/scene parsers are good first targets), coverage. Nothing in these layers has been run; none is claimed.
+
+**CI:** `.github/workflows/ci.yml` exists (Linux: `make` Debug / ASan+UBSan / Release, all `STRICT=1`; Windows: CMake + MSVC build and ctest, no Qt). It has **not been run on GitHub yet**; the Linux commands were run locally with identical results (see DEVELOPMENT_STATUS.md). Editor/Qt tests and the GPU spike are not in CI.
 
 ## Latest recorded results
 See `DEVELOPMENT_STATUS.md` ("Verification") for exact command output summaries and the environment.

@@ -1,0 +1,96 @@
+# K Engine - initial CI smoke workflow (M0-T06).
+#
+# What this claims, and nothing more:
+#   * linux-core:   the portable, Qt-free core builds warning-clean and passes its
+#                   unit, CLI and visual-selftest suites (Debug, ASan+UBSan, Release).
+#                   Linux is NOT a product platform (AGENTS.md); it is used here only
+#                   because the portable core is verified there.
+#   * windows-core: the same portable core builds and passes via CMake + MSVC on the
+#                   supported platform (Windows x64). The Qt Editor and the Direct3D
+#                   spike are NOT built in CI (no Qt install, no GPU); they stay a
+#                   manual owner check. No other OS / compiler matrix is claimed.
+#
+# Status: WRITTEN BUT NOT YET RUN on GitHub. Record the first real run in BUILDING.md.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-core:
+    name: linux core (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: debug-strict
+            make_args: "STRICT=1 check"
+          - name: asan-ubsan-strict
+            make_args: "SANITIZE=1 STRICT=1 check"
+          - name: release-strict
+            make_args: "BUILD_TYPE=Release STRICT=1 check"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain versions
+        run: |
+          mkdir -p ci-logs
+          { g++ --version | head -n 1; make --version | head -n 1; python3 --version; } 2>&1 | tee ci-logs/toolchain.txt
+
+      - name: Build and test (make ${{ matrix.make_args }})
+        run: make ${{ matrix.make_args }} 2>&1 | tee ci-logs/make-${{ matrix.name }}.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-core-${{ matrix.name }}-logs
+          path: ci-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  windows-core:
+    name: windows core (cmake + MSVC, no Qt)
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash   # Git Bash on the runner: pipefail is on, so `| tee` keeps the real exit code
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain versions
+        run: |
+          mkdir -p ci-logs
+          { cmake --version | head -n 1; python --version; } 2>&1 | tee ci-logs/toolchain.txt
+
+      - name: Configure
+        run: cmake -S . -B Build/cmake 2>&1 | tee ci-logs/cmake-configure.log
+
+      - name: Build (Debug)
+        run: cmake --build Build/cmake --config Debug 2>&1 | tee ci-logs/cmake-build.log
+
+      - name: Test (ctest)
+        run: ctest --test-dir Build/cmake -C Debug --output-on-failure --timeout 900 2>&1 | tee ci-logs/ctest.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-core-logs
+          path: |
+            ci-logs/
+            Build/cmake/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
+          retention-days: 14

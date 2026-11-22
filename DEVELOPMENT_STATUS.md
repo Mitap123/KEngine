@@ -1,6 +1,6 @@
 # Development status (handoff)
 
-**Date:** 2026-11-19 · **Milestone:** M0 complete except CI (M0-T06); M0.5: engine side and viewport verified on the target machine; Qt Editor shell WRITTEN BUT NEVER COMPILED with real Qt (stopped here at the owner's request) · **Branch:** `main`
+**Date:** 2026-11-23 · **Milestone:** M0 complete except CI (M0-T06: workflow written, not yet run on GitHub); M0.5: engine side and viewport verified on the target machine; Qt Editor shell WRITTEN BUT NEVER COMPILED with real Qt (stopped here at the owner's request) · **Branch:** `main`
 
 ## Summary
 New project (no pre-existing repository). Session 1 established the control documents, ADRs, a verified build/test route, a minimal CLI, and the first M0.5 engine slice (identity, authoring scene, strict JSON, scene serialization). Session 2 added scene **file** save/load (atomic, with backup and bounded, validated load). The Qt Editor, renderer and everything GUI-related remains **blocked by the environment**, not started.
@@ -19,6 +19,12 @@ New project (no pre-existing repository). Session 1 established the control docu
 | Profilers | not investigated |
 
 Consequence: CMake/Qt/Rust/GPU work cannot be built or verified here. Work that does not need them proceeded.
+
+## Session 9 (2026-11-23): Linux re-verification + CI workflow (no Windows/Qt access)
+**Re-verified on the final session-8 tree (Linux, GCC 13.3, 1 core):** `make STRICT=1 check` exit 0 (22 s incl. build of the rest); `make SANITIZE=1 STRICT=1 check` exit 0 (48 s, no sanitizer report; first ASan+UBSan run since the Editor core was added); `make BUILD_TYPE=Release STRICT=1 check` exit 0; `make BUILD_TYPE=Release STRICT=1 check-full` exit 0. Every run: unit 152/152 (not_run=0), CLI 21 OK, visual self-test 8 OK.
+**CI (M0-T06, partial):** added `.github/workflows/ci.yml`. `linux-core` (ubuntu-24.04) runs the three make configurations above; `windows-core` (windows-2022) runs CMake configure/build (Debug)/ctest without Qt, which also exercises the CMake route's portable part. Logs are uploaded as artifacts (always). Checked only that the YAML parses (PyYAML); **not run on GitHub**, so the Windows job (default generator, runtime) is unverified. Not claimed: any other OS/compiler, Editor or GPU tests in CI.
+**Not done / still unknown:** everything under "Next task" (owner's Windows run and the Editor manual checklist) is unchanged.
+**Process note:** the first background build died with its shell (no exit line); reran detached, results above are from the reruns.
 
 ## Session 8 (2026-11-19): first real-Qt compile of the Editor
 **Owner's run (Windows 10, MSVC 19.51, Qt 6.12.0, CMake with `-DKENGINE_BUILD_EDITOR=ON`):**
@@ -146,4 +152,4 @@ cmake --build Build/cmake --config Debug
 ctest --test-dir Build/cmake -C Debug --output-on-failure
 ```
 (`cmake --build` re-configures because `CMakeLists.txt` changed; no manual PATH needed any more.) Expect 6/6. If `editor_smoke` fails, paste its printed `[ OK ]/[FAIL]` list (or run `$env:PATH="D:\Qt\6.12.0\msvc2022_64\bin;$env:PATH"; .\Build\cmake\Editor\App\Debug\k_editor.exe --smoke`). Then run `k_editor.exe --demo` by hand and answer the checklist in `Editor/App/README.md`. Optional: the per-test milliseconds of the slowest unit tests (`.\Build\cmake\Debug\k_unit_tests.exe`, ~80 s) so I can cut the Windows run time further.
-**Then (me):** fix what the smoke/manual run shows; M05-T09 final acceptance; M0-T06 CI; Explorer drag-and-drop reparent; composite commands; project manifest + `k create`.
+**Then (me):** fix what the smoke/manual run shows; M05-T09 final acceptance; M0-T06 CI (first GitHub run + record it in BUILDING.md); Explorer drag-and-drop reparent; composite commands; project manifest + `k create`.
