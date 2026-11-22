@@ -58,6 +58,11 @@ CMake is written but UNVERIFIED (no cmake in the original dev environment); see 
 - Math/coordinate conventions are fixed by ADR-0010 (right-handed, +Y up, row-major `Mat4`, column vectors, Euler `Ry*Rx*Rz`, local transforms, CCW front faces, depth [0,1]). Do not change them without an ADR and a schema bump.
 - Windows/Direct3D/Qt code compiles and runs on the owner's machine (MSVC, Qt 6.12, Windows 10) but only what the owner has reported is verified: say exactly which behaviours were observed. Stub-level syntax checks do NOT verify behaviour (they missed an unbound shader constant buffer).
 
+## Editor layering and test modes
+- Editor logic that does not need Qt/Windows goes in `Editor/Core` (unit-tested); `Editor/App` only binds widgets to it. Keep it that way: it is what makes the Editor testable on Linux.
+- `Editor/App` has NEVER been compiled with the real Qt; stub checks do not verify behaviour. Say so until the owner reports a build.
+- Unit tests default to fast sizes; `KENGINE_TEST_FULL=1` / `make check-full` runs the full sizes. Run full mode after touching loading/hierarchy/history code.
+
 ## Known open risks (details in ADRs)
 - Handles are domain-typed, but two scenes share a handle type (ADR-0003): use UUIDs across scenes.
 - Renderer/Qt path unverified on real hardware (ADR-0004); Qt licensing undecided (ADR-0005); project license not chosen.

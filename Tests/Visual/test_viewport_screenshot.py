@@ -4,8 +4,10 @@ unless KENGINE_VIEWPORT_SPIKE points at k_viewport_spike.exe.
 
 Qt's DLLs must be findable (PATH or windeployqt), as for running the exe by hand.
 Set KENGINE_VIEWPORT_NO_WARP=1 to insist on the real GPU (fails instead of using WARP).
+KENGINE_VIEWPORT_ARGS adds arguments before --screenshot (k_editor needs --demo to have content).
 """
 import os
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -20,7 +22,8 @@ class ViewportScreenshotTests(unittest.TestCase):
     def test_screenshot_is_lit_and_not_black(self):
         with tempfile.TemporaryDirectory() as d:
             out = os.path.join(d, "shot.png")
-            args = [EXE, "--screenshot", out] + (["--no-warp"] if os.environ.get("KENGINE_VIEWPORT_NO_WARP") else [])
+            extra = shlex.split(os.environ.get("KENGINE_VIEWPORT_ARGS", ""))     # e.g. "--demo" for k_editor
+            args = [EXE] + extra + ["--screenshot", out] + (["--no-warp"] if os.environ.get("KENGINE_VIEWPORT_NO_WARP") else [])
             r = subprocess.run(args, capture_output=True, text=True, timeout=60)
             self.assertEqual(r.returncode, 0, msg="exit %d\n%s\n%s" % (r.returncode, r.stdout, r.stderr))
             self.assertTrue(os.path.exists(out), "no screenshot was written")

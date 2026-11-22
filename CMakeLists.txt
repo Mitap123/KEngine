@@ -18,7 +18,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(KENGINE_SANITIZE "Build with AddressSanitizer + UBSan (GCC/Clang)" OFF)
 option(KENGINE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
-option(KENGINE_BUILD_EDITOR_SPIKE "Build the Qt6 + Direct3D 11 viewport spike (Windows only, UNVERIFIED)" OFF)
+option(KENGINE_BUILD_EDITOR_SPIKE "Build the Qt6 + Direct3D 11 viewport spike (Windows only)" OFF)
+option(KENGINE_BUILD_EDITOR "Build the Qt6 + Direct3D 11 Editor k_editor (Windows only, first compile pending)" OFF)
 
 if(MSVC)
   # Report the real C++ standard in __cplusplus, treat sources as UTF-8, strict conformance.
@@ -85,4 +86,8 @@ endif()
 
 if(KENGINE_BUILD_EDITOR_SPIKE)
   add_subdirectory(Editor/Spike)
+endif()
+
+if(KENGINE_BUILD_EDITOR)
+  add_subdirectory(Editor/App)
 endif()

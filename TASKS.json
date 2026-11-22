@@ -203,7 +203,7 @@
         {
           "id": "M05-T01",
           "title": "Create Qt application shell and dock layout",
-          "status": "pending",
+          "status": "partial",
           "priority": "P0",
           "depends_on": [
             "M0-T04"
@@ -221,12 +221,19 @@
           "verification_plan": [
             "Application startup smoke test and Qt GUI test where available"
           ],
-          "verification_commands": [],
+          "verification_commands": [
+            "make STRICT=1 test (Editor/Core only)"
+          ],
           "out_of_scope": [
             "Full command palette and theme system"
           ],
-          "evidence": [],
-          "notes": "Unblocked: the Windows toolchain (MSVC 19.51, Qt 6.12, CMake) builds this repo and the viewport renders on the target GPU. Start after the owner confirms the re-verification of M05-T03b (lit shading, interactive controls). Qt Widgets only (ADR-0004)."
+          "evidence": [
+            "Editor/Core/*",
+            "Editor/App/*",
+            "Tests/Unit/test_editor_core.cpp",
+            "Editor/App/README.md"
+          ],
+          "notes": "Qt-free core done and tested (152 unit tests). Qt shell (MainWindow, EditorViewport, main) WRITTEN BUT NEVER COMPILED with real Qt; stub-level syntax check only. Owner must build with -DKENGINE_BUILD_EDITOR=ON and run ctest (editor_smoke, editor_screenshot) and the manual checklist in Editor/App/README.md."
         },
         {
           "id": "M05-T02",
@@ -335,7 +342,7 @@
         {
           "id": "M05-T03b",
           "title": "Verify the Direct3D 11 (feature level 10_1) viewport spike on the target hardware",
-          "status": "partial",
+          "status": "done",
           "priority": "P0",
           "depends_on": [
             "M05-T03a"
@@ -353,9 +360,11 @@
             "Follow Editor/Spike/README.md steps 0-3 on the owner's machine"
           ],
           "verification_commands": [],
-          "notes": "Owner ran steps 0-3: everything built; hardware device at feature level 10_0 (NOT 10_1); screenshot written, exit 0, no WARP. Defects found: black surfaces (PS constant buffer unbound -> fixed) and a Windows scene-file test failure (fallback sync mapping -> fixed with a real Win32 save path). Remaining: rerun after the fixes (expect ctest 2/2, lit shapes), report interactive controls (orbit/pan/zoom/select/resize) and the label.",
+          "notes": "Owner re-ran 2026-11-19 after the fixes: build 0 errors/0 warnings; ctest 4/4 (unit 135/135, cli 21, png_probe 8, viewport_screenshot); lit shading confirmed (lit 50.67%, black 0%); orbit, pan, zoom, click-select (orange + label), click-to-clear and resize/maximize all work; label text recorded. GPU: Intel HD Graphics 0x0046, feature level 10_0, hardware (no WARP).",
           "evidence": [
-            "Owner run 2026-11-19 (see DEVELOPMENT_STATUS.md, ADR-0004 \"Measured results\")"
+            "Owner report 2026-11-19",
+            "ADR-0004 Measured results",
+            "Tests/Visual/*"
           ]
         },
         {
@@ -390,7 +399,7 @@
         {
           "id": "M05-T04",
           "title": "Add selection synchronization and transform editing",
-          "status": "pending",
+          "status": "partial",
           "priority": "P0",
           "depends_on": [
             "M05-T02",
@@ -414,7 +423,8 @@
           "verification_commands": [],
           "out_of_scope": [
             "Advanced multi-select gizmo behavior"
-          ]
+          ],
+          "notes": "Selection (Explorer and viewport click) and Inspector transform/name editing are implemented in Editor/Core + Editor/App; the core is tested, the UI binding is unverified until the first Qt compile/run."
         },
         {
           "id": "M05-T05",
@@ -592,7 +602,8 @@
           "verification_commands": [],
           "out_of_scope": [
             "Declaring the entire Editor production-ready"
-          ]
+          ],
+          "notes": "Hello Cube workflow is covered without a GUI by test_editor_core.cpp (create, pick, drag-transform, save, reopen, undo/redo, Play/Stop, source unchanged). The GUI version is k_editor --smoke (unrun). Final acceptance needs the owner to run it."
         },
         {
           "id": "M05-T10",

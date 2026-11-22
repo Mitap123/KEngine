@@ -1,6 +1,6 @@
 # Development status (handoff)
 
-**Date:** 2026-11-19 · **Milestone:** M0 nearly complete; M0.5 engine side complete; first hardware run done (viewport renders on the target GPU, two defects found and fixed, re-verification pending); Editor shell not started · **Branch:** `main`
+**Date:** 2026-11-19 · **Milestone:** M0 complete except CI (M0-T06); M0.5: engine side and viewport verified on the target machine; Qt Editor shell WRITTEN BUT NEVER COMPILED with real Qt (stopped here at the owner's request) · **Branch:** `main`
 
 ## Summary
 New project (no pre-existing repository). Session 1 established the control documents, ADRs, a verified build/test route, a minimal CLI, and the first M0.5 engine slice (identity, authoring scene, strict JSON, scene serialization). Session 2 added scene **file** save/load (atomic, with backup and bounded, validated load). The Qt Editor, renderer and everything GUI-related remains **blocked by the environment**, not started.
@@ -19,6 +19,15 @@ New project (no pre-existing repository). Session 1 established the control docu
 | Profilers | not investigated |
 
 Consequence: CMake/Qt/Rust/GPU work cannot be built or verified here. Work that does not need them proceeded.
+
+## Session 7 (2026-11-19): re-verification, faster tests, Editor core + Qt shell (stopped early)
+**Owner's re-verification (all good):** build 0 errors/0 warnings; ctest **4/4** (`unit` 135/135 incl. the new Windows save path, `cli` 21, `png_probe` 8, `viewport_screenshot`); shapes now lit (lit 50.67%, black 0%); by hand on the i5-560M: orbit, pan (right-drag and Shift+left-drag), zoom, click-select (orange, label shows the name), click-empty clears, resize/maximize all work; label `Intel(R) HD Graphics | FL 10_0 | hardware | frame ~0.5 ms`. M05-T03b is **done**. The two defects of session 6 are confirmed fixed.
+**New finding from that report:** `unit` took **311 s** on Windows Debug (MSVC iterator debugging + a 2010 CPU). Measured on Linux Debug it was 35 s; five tests dominated. Fix: tests now have **fast (default) and full sizes** (`KENGINE_TEST_FULL=1`, `make check-full`, `-DKENGINE_FULL_TESTS=ON`/ctest `unit_full`): Linux Debug 35 s -> 4.3 s, full mode still passes; the runner prints per-test milliseconds. The Windows time with the new default has **not been measured**.
+**Editor core (Qt-free, verified on Linux):** `Editor/Core` = `EditorDocument` (new/open/save/save-as with failure atomicity, selection by UUID auto-cleared, create with unique default names, rename, transform edit with merge, delete, undo/redo labels, Play/Stop, `adopt_scene`), `ExplorerModel`, `InspectorModel` (replace exactly one axis, clamping, scale >= 0.001), `PlayDemo`, `CameraFraming` (aspect-aware, tested by projecting all 8 corners of every object into the frustum), `DemoScene`. 17 new unit tests incl. the **Hello Cube workflow without a GUI**. 10 mutation checks: 8 caught at once, 2 survived (failed `open` changing the path; a selection that only existed in the play copy surviving Stop) -> tests added -> all caught. A 11th mutant was invalid (unused variable) and was redone.
+**Qt Editor shell (`Editor/App`, UNVERIFIED):** `MainWindow` (menus, toolbar, Explorer/Inspector/Console docks, status bar, Play/Stop with a 16 ms timer, close prompt for unsaved changes, `--smoke` self-test of the real widgets), `EditorViewport` (spike's viewport bound to `EditorDocument`), `main` (`--demo`, `--screenshot`, `--smoke`, `--no-warp`, file argument), `CMakeLists.txt` (`-DKENGINE_BUILD_EDITOR=ON`; ctest `editor_smoke`, `editor_screenshot`), `README.md` with build steps and the report checklist. **Never compiled with real Qt.** The only check is `g++ -fsyntax-only` against a hand-written minimal Qt stub in `/tmp` (NOT in the repo): it caught nothing in the final code and was shown to catch a typo and a wrong lambda arity (negative controls); it cannot validate real Qt signatures or behaviour. Review findings fixed before stopping: a clumsy ternary in `do_create`, `QString::arg(size_t)` ambiguity, a smoke step that left the cube at scale 0.001.
+**Stopped at the owner's request** after the stub-level check; no further Editor work was done.
+**Verification at the end of this session (Linux):** `make STRICT=1 check` (Debug) exit 0, unit 152/152, CLI 21, visual self-test 8; `make BUILD_TYPE=Release STRICT=1 check` exit 0, same counts. **ASan+UBSan was NOT rerun on the final tree** (last run: 135/135 before the editor core existed) and `make check-full` was not rerun after the final edits (it passed after the fast/full change, before the editor core).
+**Own mistakes this session:** underestimated Linux test time (assumed seconds, was 35 s); two test gaps found only by mutation (above); first stub check hit gaps in my own stub (not in the code).
 
 ## Session 6 (2026-11-19): first run on the owner's machine
 **Environment reported:** Windows 10 Pro 19045; Intel Core i5-560M; Intel HD Graphics (0x8086:0x0046), driver 8.15.10.2900 (2012-11-26), 64 MB dedicated + 1632 MB shared; MSVC 19.51.36260.0 (VS Build Tools), Windows SDK 10.0.22000.0, Qt 6.12.0 `msvc2022_64`.
@@ -98,6 +107,8 @@ No scratch directories were left in the system temp dir by the tests. Compiled w
 Process notes: an earlier mutation run was invalidated by a stale-object (mtime) bug in my script and was redone; first results were discarded.
 
 ## Tests/checks NOT run
+Real-Qt compile and run of `Editor/App` (`editor_smoke`, `editor_screenshot`, manual checklist); ASan+UBSan on the final tree (editor core added after the last run); `make check-full` on the final tree; the Windows unit-test duration with the new fast default; Windows 11, Release/MinGW/Ninja builds.
+(Older list, still true where not contradicted above:)
 CMake configure/build/ctest (no cmake); any Qt/GUI/viewport/screenshot test; integration, determinism, performance, fuzz, coverage; CI (not written); Clang or any non-GCC/non-Linux build; non-POSIX scene-file fallback; real disk-full / I/O-error / power-loss behaviour (only simulated by the fault hook); permission-denied cases (suite runs as root); coverage-guided / long-running parser fuzzing (only a bounded deterministic mutation fuzzer ran).
 
 ## Known risks / bugs
@@ -122,10 +133,12 @@ CMake configure/build/ctest (no cmake); any Qt/GUI/viewport/screenshot test; int
 3. Is a non-Windows Editor/viewport ever required? (It would need a second renderer backend behind `DrawList`.)
 
 ## Next task (exact)
-**Owner: rebuild and re-verify (M05-T03b), about 5 minutes.** Pull this version, then:
+**Owner (≈10 min): first compile of the Editor.** Follow `Editor/App/README.md`:
 ```
+cmake -S . -B Build/cmake -DKENGINE_BUILD_EDITOR_SPIKE=ON -DKENGINE_BUILD_EDITOR=ON -DCMAKE_PREFIX_PATH=D:/Qt/6.12.0/msvc2022_64
 cmake --build Build/cmake --config Debug
 ctest --test-dir Build/cmake -C Debug --output-on-failure
 ```
-Expect **4/4 tests**: `unit` (135/135, including the Windows save path), `cli`, `png_probe`, and `viewport_screenshot` (needs Qt's `bin` on PATH or `windeployqt`; it fails if surfaces are black). Then run `k_viewport_spike.exe` by hand and tell me, one line each: lit light-blue shapes (not black)? orbit (left drag)? pan (right drag / Shift+left drag)? zoom (wheel)? click selects (turns orange, label names it)? click empty space clears? resize/maximize keeps rendering? And paste any failing test output verbatim.
-**Then (me): M05-T01, the Qt Widgets Editor shell** (Explorer tree, Inspector with name + position/rotation/scale, Console, Viewport dock) wired to `SceneEditor`, File New/Open/Save, Edit Undo/Redo, Play/Stop buttons; followed by M05-T04 (selection + transform editing) and M05-T09 (Hello Cube acceptance run). The Qt-free engine side is complete, so this is the critical path. Optional meanwhile: composite commands, project manifest + `k create` (needs the JSON-vs-TOML decision), smaller JSON nodes (memory ~15x file size).
+Send back, verbatim: any compiler errors (expect a few small ones on first contact with real Qt), the ctest summary (expect 6 tests: unit, cli, png_probe, viewport_screenshot, editor_smoke, editor_screenshot; note the new `unit` duration), the `editor_smoke` check list if it fails, and the manual checklist answers from the README.
+**Then (me):** fix whatever the compile/smoke run shows; then M05-T09 final acceptance (Hello Cube in the real window), M0-T06 CI, and the remaining items: drag-and-drop reparent in the Explorer, composite commands (duplicate/paste), project manifest + `k create` (needs the JSON-vs-TOML decision), smaller JSON nodes (load memory ~15x file size).
+**Do not** build further Editor features before that first compile/run: everything in `Editor/App` is unverified.

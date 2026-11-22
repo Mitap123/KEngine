@@ -25,6 +25,9 @@ public:
     // Replace the content with an empty untitled scene (the caller asks about unsaved
     // changes first). Refused while playing: editor.read_only_while_playing.
     Status new_scene();
+    // Replaces the content with `scene` as an untitled, clean document (demo content, imports).
+    // Refused while playing.
+    Status adopt_scene(Scene scene);
     // Loads a file. On failure the current document is left untouched. Warnings from the
     // load (e.g. ignored unknown fields) are available via warnings().
     Status open(const std::filesystem::path& path);

@@ -14,19 +14,20 @@ Statuses: PLANNED, PROTOTYPE, IMPLEMENTED, TESTED, STABLE, BLOCKED. Each status 
 | Scene file I/O on non-POSIX platforms (fallback code path) | PROTOTYPE | compiled only when not POSIX; never built or run |
 | CLI `k --version`, `--help`, `doctor [--json]` | TESTED | `Tests/CLI/test_cli.py` |
 | Make build (Debug/Release/ASan+UBSan, strict warnings) | TESTED | `make check` variants |
-| CMake build on Windows 10 (MSVC 19.51, Qt 6.12) | IMPLEMENTED | owner ran it 2026-11-19: configure + build OK, `cli` test passed, `unit` 134/135 (one Windows-path bug, fixed, awaiting rerun). Not TESTED until the rerun is 2/2. Not tried with MinGW/Ninja/Release |
+| CMake build on Windows 10 (MSVC 19.51, Qt 6.12) | TESTED | owner: build 0 errors/0 warnings; ctest 4/4 (unit 135/135, cli, png_probe, viewport_screenshot). Not tried: MinGW, Ninja, Release, Windows 11 |
 | CI workflow | PLANNED | M0-T06 |
 | Project creation / manifest | PLANNED | |
 | Domain-typed handles (`ObjectHandle`; cross-domain use is a compile error) | TESTED | `static_assert`s in `test_handle.cpp`, compile-fail check |
 | Math (Mat4/Vec3), scene local/world transforms | TESTED | `test_math.cpp`, `test_rendering_geometry.cpp` (incl. depth-100,000 chains) |
 | Primitive meshes (cube/sphere/plane), orbit camera, screen rays, CPU picking, DrawList | TESTED | `test_rendering_geometry.cpp`, `test_camera_picking.cpp`; 12 mutation checks |
 | `k_gpu_probe` (adapter / feature-level report) | TESTED | owner ran it: Intel HD Graphics 0x8086:0x0046 -> feature level **10_0**; WARP and Basic Render Driver 11_0 |
-| Direct3D 11 renderer, feature level 10_0 floor (hardware device, SM 4.0 shaders, back-buffer capture) | IMPLEMENTED | runs on the target GPU with `--no-warp`, exit 0, PNG written, geometry/silhouettes correct; first run showed all-black surfaces (PS constant buffer unbound) - **fixed, not yet re-verified**; frame times ~2-12 ms (capture frame 28-38 ms) |
+| Direct3D 11 renderer, feature level 10_0 floor (hardware device, SM 4.0 shaders, back-buffer capture) | TESTED | owner re-ran after the fix: lit shapes (lit 50.67%, black 0%), `viewport_screenshot` passed on the real GPU, frame ~0.5 ms |
 | Qt viewport widget + spike app: window, init, render, `--screenshot`, `--no-warp` | IMPLEMENTED | observed on the owner's machine (console output, exit 0, PNG) |
-| Spike interactive controls (orbit/pan/zoom/click-select/resize) | PROTOTYPE | compiled, **behaviour not reported yet** |
-| Qt Editor shell (docks, explorer, inspector) | BLOCKED | needs the owner's Windows/Qt machine; not started |
-| Viewport verified on the target GPU (i5-560M iGPU, FL 10_0) | IMPLEMENTED | renders on the real GPU; lit shading and interaction awaiting the owner's re-verification |
-| Windows scene-file save path (CreateFileW + FlushFileBuffers + MoveFileExW) | PROTOTYPE | replaces the generic fallback that failed one Windows test; compiled/run result pending the owner's rerun |
+| Spike interactive controls (orbit/pan/zoom/click-select/resize) | TESTED | owner confirmed all 7 behaviours by hand on the target machine (2026-11-19) |
+| Editor core logic, Qt-free: `EditorDocument` (new/open/save/save-as, selection by UUID, create with unique names, rename, transform, delete, undo/redo labels, Play/Stop), Explorer rows, Inspector axis edits, play demo, "Frame All", demo scene | TESTED | `test_editor_core.cpp` (incl. the Hello Cube workflow without a GUI); 10 mutation checks all caught (2 survived first, tests added) |
+| Qt Editor shell `k_editor` (menus, toolbar, Explorer/Inspector/Console docks, viewport, Play/Stop, `--smoke`, `--screenshot`) | PROTOTYPE | written; **never compiled with real Qt**; syntax-checked only against a hand-written Qt stub; first compile on the owner's machine pending |
+| Viewport verified on the target GPU (i5-560M iGPU, FL 10_0) | TESTED | rendering, shading, orbit/pan/zoom/select/clear/resize confirmed by the owner |
+| Windows scene-file save path (CreateFileW + FlushFileBuffers + MoveFileExW) | TESTED | owner's rerun: `unit` 135/135 on Windows 10 (MSVC Debug), incl. fault injection at every stage; real disk-full/power-loss not tested |
 | Selection sync, transform editing UI | BLOCKED | depends on Editor shell |
 | Undo/redo for create/delete(subtree)/transform/rename/reparent, merge of drags, dirty tracking (`SceneEditor`, Qt-free) | TESTED | `test_commands.cpp` incl. randomized snapshot-model check; 14+ mutation checks. No UI yet |
 | Play/Stop isolation (value copy of the authoring scene; edits/undo blocked while playing) | TESTED | `test_commands.cpp` (`play_*`, 500 repeated sessions). Engine-side only: no runtime loop, no Editor buttons yet |

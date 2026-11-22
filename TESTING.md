@@ -16,6 +16,9 @@ Filter unit cases: `Build/make-debug/k_unit_tests <substring>`; list: `--list`.
 | Visual self-test | `Tests/Visual/test_png_probe.py` | `make visual-selftest` | the PNG reader (all filter types, rejection of unsupported files; cross-checked once against PIL's independent encoder) and the black/lit pixel analysis, on synthetic images |
 | Visual probe (Windows) | `Tests/Visual/test_viewport_screenshot.py` | ctest `viewport_screenshot` (when `-DKENGINE_BUILD_EDITOR_SPIKE=ON`) | runs `k_viewport_spike --screenshot`, fails if surfaces render black or too little lit geometry is visible. **Added after the first hardware run found all-black surfaces; not yet run by the owner** |
 
+| Editor core (Qt-free) | `Tests/Unit/test_editor_core.cpp` | part of `make test` | document/selection/file/Play behaviour, Explorer rows, Inspector axis edits, play demo, camera framing (all 8 corners of every object inside the frustum), demo scene, Hello Cube workflow |
+| Editor UI smoke (Windows) | ctest `editor_smoke` (`k_editor --smoke`) | `-DKENGINE_BUILD_EDITOR=ON` | drives the real widgets through the workflow. **Not yet run** |
+
 ## Layers that do NOT exist yet
 Integration (Editor workflows), GUI interaction, determinism, performance/benchmarks, fuzzing (JSON/scene parsers are good first targets), coverage, CI. Nothing in these layers has been run; none is claimed.
 

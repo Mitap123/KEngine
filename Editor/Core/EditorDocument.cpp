@@ -47,6 +47,15 @@ Status EditorDocument::new_scene() {
     return Status::success();
 }
 
+Status EditorDocument::adopt_scene(Scene scene) {
+    if (playing()) return read_only_while_playing();
+    editor_ = SceneEditor(std::move(scene));
+    path_.clear();
+    selected_ = Uuid();
+    warnings_.clear();
+    return Status::success();
+}
+
 Status EditorDocument::open(const std::filesystem::path& path) {
     if (playing()) return read_only_while_playing();
     std::vector<std::string> warnings;

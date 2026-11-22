@@ -1,6 +1,6 @@
 # ADR-0004: Renderer backend and Qt integration (hardware floor: Direct3D 10.1)
 
-- **Status:** accepted. The direction was **validated on the owner's target machine** (2026-11-19, see "Measured results"): a Direct3D 11 device on the real GPU is created and renders. The hardware floor is **feature level 10_0**, not 10_1 (the table below was corrected from the measurement). One rendering defect found on that run (black surfaces) is fixed but awaiting re-verification. Supersedes the first draft (OpenGL 3.3 core via `QOpenGLWidget`), which is **rejected**.
+- **Status:** accepted. The direction was **validated on the owner's target machine** (2026-11-19, see "Measured results"): a Direct3D 11 device on the real GPU is created and renders. The hardware floor is **feature level 10_0**, not 10_1 (the table below was corrected from the measurement). The rendering defect found on the first run (black surfaces) was fixed and **re-verified by the owner** (lit shapes, 0% black pixels, all interactive controls work). Supersedes the first draft (OpenGL 3.3 core via `QOpenGLWidget`), which is **rejected**.
 - **Date:** 2026-11-19
 
 ## Context
@@ -45,7 +45,7 @@ Environment: Windows 10 Pro 19045, Qt 6.12.0 (msvc2022_64), MSVC 19.51.36260.0 (
 - `k_viewport_spike --screenshot out.png` **and** `--no-warp` (so a real hardware device, no WARP): exit code 0, "screenshot saved". Console showed `Intel(R) HD Graphics | FL 10_0 | hardware | frame ~2-12 ms`, with ~28-38 ms on the third frame (the capture frame, which includes a GPU read-back and CPU map; plausible, not investigated).
 - `out.png`: all primitives (ground plane, cube, sphere, child cube) in the correct positions and silhouettes on the dark background, **but every surface completely black**.
 - **Root cause of the black surfaces:** the pixel shader reads `color` from the `Object` constant buffer (b1) but the buffer was bound to the vertex stage only (`VSSetConstantBuffers`), so the pixel stage saw zeros. Fixed by also calling `PSSetConstantBuffers(1, 1, ...)`. **Not yet re-verified on hardware.** A stub-level syntax check cannot catch this class of bug.
-- **Not reported by the owner (still unknown):** whether orbit / pan / zoom / click-to-select / resize work interactively; the on-screen label text (the console line suggests it is correct).
+- **Re-verification after the fix (owner, same day):** ctest 4/4; screenshot lit 50.67% / black 0%; orbit, pan, zoom, click-select (orange + label), click-to-clear and resize/maximize all work; label `Intel(R) HD Graphics | FL 10_0 | hardware | frame ~0.5 ms`.
 
 ## Evidence
 - **Verified here (Linux/GCC):** everything that feeds the renderer — `DrawList`, primitive meshes (closed, consistently wound, outward normals), orbit camera, projection/view math with Direct3D clip depth [0,1], picking — covered by unit tests and mutation checks (see TESTING.md).
@@ -64,8 +64,8 @@ Replace the backend behind `DrawList`; scene files, the Scene model, picking and
 
 ## Validation plan (owner's machine; each step is a pass/fail with a recorded output)
 1. Build and run `k_gpu_probe`. **Done: confirmed the adapter and refuted the 10_1 assumption.**
-2. Build and run `k_viewport_spike`; the window shows ground, cube, sphere and a child cube, orbit/pan/zoom work, clicking highlights an object in orange. **Partly done: window and geometry OK; shading fix and interactive controls still to confirm.**
-3. `k_viewport_spike --screenshot out.png` writes a non-blank PNG and exits 0. **Done (exit 0, PNG written); the PNG was black-shaded before the fix.**
+2. Build and run `k_viewport_spike`; the window shows ground, cube, sphere and a child cube, orbit/pan/zoom work, clicking highlights an object in orange. **Done (owner, re-verified after the shading fix).**
+3. `k_viewport_spike --screenshot out.png` writes a non-blank PNG and exits 0. **Done (exit 0, PNG written, lit; automated by the `viewport_screenshot` test).**
 4. Record OS version, GPU driver version, Qt version/kit and compiler in `DEVELOPMENT_STATUS.md`. If any step fails, fix this ADR before writing more viewport code.
 
 ## Open questions for the owner

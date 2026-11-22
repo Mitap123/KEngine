@@ -3,6 +3,7 @@
 #include <string>
 
 #include "Editor/Core/CameraFraming.h"
+#include "Editor/Core/DemoScene.h"
 #include "Editor/Core/EditorDocument.h"
 #include "Editor/Core/ExplorerModel.h"
 #include "Editor/Core/InspectorModel.h"
@@ -159,6 +160,23 @@ KTEST(document_file_operations_title_dirty_and_failures) {
     KCHECK(e.new_scene().ok());
     KCHECK_EQ(e.title(), std::string("Untitled"));
     KCHECK(e.scene().object_count() == 0 && !e.can_undo() && e.selected().is_nil() && !e.has_path());
+}
+
+KTEST(document_adopt_scene_replaces_everything_as_a_clean_untitled_document) {
+    EditorDocument d;
+    make(d, ObjectKind::Cube);
+    KCHECK(d.is_dirty() && d.can_undo());
+    Scene demo;
+    build_demo_scene(demo);
+    const std::string expected = snap(demo);
+    KCHECK(d.adopt_scene(std::move(demo)).ok());
+    KCHECK_EQ(snap(d.scene()), expected);
+    KCHECK(!d.is_dirty() && !d.can_undo() && d.selected().is_nil() && !d.has_path());
+    KCHECK_EQ(d.title(), std::string("Untitled"));
+    KCHECK(d.play().ok());
+    KCHECK_EQ(code(d.adopt_scene(Scene{})), std::string("editor.read_only_while_playing"));
+    KCHECK_EQ(snap(d.editor().scene()), expected);               // refused: nothing changed
+    KCHECK(d.stop().ok());
 }
 
 KTEST(document_open_reports_load_warnings) {
@@ -499,4 +517,28 @@ KTEST(hello_cube_workflow_create_transform_save_reopen_undo_play_stop) {
     KCHECK(d.stop().ok());
     KCHECK_EQ(snap(d.scene()), authored);
     KCHECK(!d.is_dirty());                                    // Play never dirties the document
+}
+
+// -------------------------------------------------------------------- demo ---
+
+KTEST(demo_scene_has_the_documented_content) {
+    Scene s;
+    build_demo_scene(s);
+    const auto rows = build_explorer_rows(s);
+    KCHECK_EQ(rows.size(), static_cast<std::size_t>(5));
+    if (rows.size() != 5) return;
+    KCHECK_EQ(rows[0].name, std::string("Ground"));
+    KCHECK(rows[0].kind == ObjectKind::Plane);
+    KCHECK_EQ(rows[3].name, std::string("Group"));
+    KCHECK_EQ(rows[4].name, std::string("Child Cube"));
+    KCHECK(rows[4].parent == rows[3].id && rows[4].depth == 1);
+    // The demo is visible and pickable from the default camera (so the screenshot probe has content to judge).
+    OrbitCamera cam;
+    frame_scene(cam, s, 1.5);
+    KCHECK(everything_visible(cam, s, 1.5));
+    const auto center = cam.screen_ray(600, 400, 1200, 800);
+    KCHECK(center.valid);
+    // Round trips through a file like any other scene.
+    auto again = load_scene_from_string(save_scene_to_string(s).value());
+    KCHECK(again.ok());
 }
