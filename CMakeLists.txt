@@ -9,7 +9,7 @@
 #
 # Sources are collected by the same globs as the Makefile so the two cannot
 # drift on file lists.
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.22)   # 3.22: test property ENVIRONMENT_MODIFICATION (used by the Qt-based tests)
 project(KEngine VERSION 0.0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)

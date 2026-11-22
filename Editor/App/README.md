@@ -1,6 +1,6 @@
 # k_editor — the K Engine Editor (M0.5) — FIRST COMPILE PENDING
 
-**Status:** written, **never compiled with the real Qt**. The only check done on `MainWindow.cpp`, `EditorViewport.cpp` and `main.cpp` is a C++ syntax/type check against a hand-written minimal Qt stub (it catches typos, wrong member names, lambda/signal arity; it does **not** validate real Qt API signatures or any behaviour). Expect a few compile fixes on the first build. The Qt-free logic behind it (`Editor/Core`) is unit-tested on Linux (152 unit tests).
+**Status (2026-11-19):** **compiled and linked cleanly with real Qt 6.12 / MSVC 19.51** on the owner's machine. **Behaviour not observed yet**: the automated tests could not start (Qt DLLs not on PATH, exit 0xC0000135) and the manual checklist below is still pending. The Qt-free logic behind it (`Editor/Core`) is unit-tested on Linux (152 unit tests).
 
 ## What it is
 Qt 6 Widgets window: menus + toolbar (File / Edit / Create / View / Play), Explorer (hierarchy tree), Inspector (name, kind, UUID, position / rotation / scale), Console, and the Direct3D 11 viewport shared with the spike (`Editor/Spike/D3D11Renderer.*`). Every action goes through `EditorDocument` (`Editor/Core`).
@@ -18,6 +18,9 @@ ctest --test-dir Build/cmake -C Debug --output-on-failure
 (Qt's `bin` folder must be on PATH, as before.) Unit tests are now **fast by default** (a few seconds on Linux); `-DKENGINE_FULL_TESTS=ON` adds ctest `unit_full` with the old full sizes.
 Expected tests: `unit`, `cli`, `png_probe`, `viewport_screenshot` (spike), and the new `editor_smoke`, `editor_screenshot`.
 
+## Troubleshooting
+- A Qt-based test or exe exiting with code **3221225781 / 0xC0000135** means a DLL was not found (almost always Qt's `bin` folder is not on PATH). The ctest tests now add Qt's `bin` to PATH themselves (re-run `cmake --build`, which re-configures); when you run an exe by hand you still need `$env:PATH = "D:\Qt\6.12.0\msvc2022_64\bin;$env:PATH"` (or `windeployqt`).
+
 ## What each new test does
 - `editor_smoke` = `k_editor --smoke`: drives the REAL widgets (Create, Explorer selection, Inspector spin boxes and name box, Undo/Redo, Save/Open of a temp file, Play/Stop) and checks the UI after each step. Prints `[ OK ]/[FAIL]` lines and `SMOKE: N checks, M failed`.
 - `editor_screenshot` = `k_editor --demo --screenshot out.png` judged by the same black/lit pixel probe as the spike.
@@ -26,6 +29,6 @@ Expected tests: `unit`, `cli`, `png_probe`, `viewport_screenshot` (spike), and t
 `Build\cmake\Editor\App\Debug\k_editor.exe --demo` (demo scene) or `k_editor.exe some.kscene`. Other flags: `--screenshot out.png`, `--smoke`, `--no-warp`.
 
 ## What to send back
-1. Compiler output of the first build, verbatim (or "built clean").
+1. ~~Compiler output~~ - done: built clean.
 2. `ctest` result for all tests; for `editor_smoke` the full printed check list if anything fails.
 3. By hand: does the window look sane (docks, menus, viewport)? Create > Cube/Sphere/Plane work? Explorer click and viewport click select and stay in sync? Editing a Position box moves the object? Rename updates the Explorer? Undo/Redo menu text changes? Save/Open round trip? Play spins the shapes and locks editing, Stop restores? Closing with unsaved changes asks?

@@ -233,7 +233,7 @@
             "Tests/Unit/test_editor_core.cpp",
             "Editor/App/README.md"
           ],
-          "notes": "Qt-free core done and tested (152 unit tests). Qt shell (MainWindow, EditorViewport, main) WRITTEN BUT NEVER COMPILED with real Qt; stub-level syntax check only. Owner must build with -DKENGINE_BUILD_EDITOR=ON and run ctest (editor_smoke, editor_screenshot) and the manual checklist in Editor/App/README.md."
+          "notes": "Qt-free core done and tested (152 unit tests). Qt shell COMPILED CLEANLY with real Qt 6.12/MSVC on the owner machine (2026-11-19) but its behaviour is not observed yet: editor_smoke/editor_screenshot failed to start (DLL not found; PATH) - fixed in CMake (tests now set PATH), awaiting rerun, plus the manual checklist in Editor/App/README.md."
         },
         {
           "id": "M05-T02",

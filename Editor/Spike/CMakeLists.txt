@@ -24,14 +24,17 @@ if(Qt6_FOUND)
   target_include_directories(k_viewport_spike PRIVATE "${CMAKE_SOURCE_DIR}")
   target_link_libraries(k_viewport_spike PRIVATE kengine_core Qt6::Widgets d3d11 dxgi ${KENGINE_D3DCOMPILER_LIB})
 
-  # Visual probe: runs the exe, decodes the PNG it writes and fails if surfaces are black.
-  # Qt's DLLs must be findable (PATH or windeployqt). Needs a GPU or WARP.
+  # Visual probe: runs the exe, decodes the PNG it writes and fails if surfaces are black. Needs a GPU or WARP.
+  # Qt's bin directory (<prefix>/lib/cmake/Qt6 -> <prefix>/bin) is put in front of PATH for the test, so it does
+  # not depend on the caller's PATH (missing DLLs show up as exit code 0xC0000135).
+  get_filename_component(KENGINE_QT_BIN_DIR "${Qt6_DIR}/../../../bin" ABSOLUTE)
   find_package(Python3 COMPONENTS Interpreter)
   if(Python3_Interpreter_FOUND)
     add_test(NAME viewport_screenshot
              COMMAND ${CMAKE_COMMAND} -E env "KENGINE_VIEWPORT_SPIKE=$<TARGET_FILE:k_viewport_spike>"
                      ${Python3_EXECUTABLE} -m unittest discover -s "${CMAKE_SOURCE_DIR}/Tests/Visual" -p test_viewport_screenshot.py -v)
-    set_tests_properties(viewport_screenshot PROPERTIES TIMEOUT 120)
+    set_tests_properties(viewport_screenshot PROPERTIES TIMEOUT 120
+                         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${KENGINE_QT_BIN_DIR}")
   endif()
 else()
   message(WARNING "Qt6 Widgets not found: only k_gpu_probe will be built. Set CMAKE_PREFIX_PATH to your Qt 6 kit.")

@@ -20,6 +20,13 @@ New project (no pre-existing repository). Session 1 established the control docu
 
 Consequence: CMake/Qt/Rust/GPU work cannot be built or verified here. Work that does not need them proceeded.
 
+## Session 8 (2026-11-19): first real-Qt compile of the Editor
+**Owner's run (Windows 10, MSVC 19.51, Qt 6.12.0, CMake with `-DKENGINE_BUILD_EDITOR=ON`):**
+- **`k_editor` compiled and linked cleanly on the first attempt** (`main.cpp`, `MainWindow.cpp`, `EditorViewport.cpp`; no errors reported). So the stub-level check had been a fair predictor of compile-ability for this code. `kengine_editor_core` and all unit tests also built.
+- ctest: `unit` **passed in 80.5 s** (was 311 s before the fast/full split; still slow on that machine), `cli` passed (6.5 s), `png_probe` passed. **`viewport_screenshot`, `editor_smoke` and `editor_screenshot` failed with exit code 3221225781 = 0xC0000135 = DLL not found**: the new PowerShell session did not have `D:\Qt\6.12.0\msvc2022_64\bin` on PATH (it was added by hand in the previous session). This is an environment/test-design problem, **not** a behaviour failure: no Editor behaviour has been observed yet.
+**Fix (unverified, no CMake here):** the Qt-based ctest tests now prepend Qt's `bin` directory to PATH themselves (`ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:..."`, directory derived from `Qt6_DIR`; `cmake_minimum_required` raised to 3.22 for that property). Troubleshooting note added to `Editor/App/README.md`. Lesson: tests must not depend on the caller's environment; the previous spike test only passed because PATH happened to be set.
+**Still unknown (needs the owner):** whether `k_editor --smoke` passes, what the window looks like, and the manual checklist.
+
 ## Session 7 (2026-11-19): re-verification, faster tests, Editor core + Qt shell (stopped early)
 **Owner's re-verification (all good):** build 0 errors/0 warnings; ctest **4/4** (`unit` 135/135 incl. the new Windows save path, `cli` 21, `png_probe` 8, `viewport_screenshot`); shapes now lit (lit 50.67%, black 0%); by hand on the i5-560M: orbit, pan (right-drag and Shift+left-drag), zoom, click-select (orange, label shows the name), click-empty clears, resize/maximize all work; label `Intel(R) HD Graphics | FL 10_0 | hardware | frame ~0.5 ms`. M05-T03b is **done**. The two defects of session 6 are confirmed fixed.
 **New finding from that report:** `unit` took **311 s** on Windows Debug (MSVC iterator debugging + a 2010 CPU). Measured on Linux Debug it was 35 s; five tests dominated. Fix: tests now have **fast (default) and full sizes** (`KENGINE_TEST_FULL=1`, `make check-full`, `-DKENGINE_FULL_TESTS=ON`/ctest `unit_full`): Linux Debug 35 s -> 4.3 s, full mode still passes; the runner prints per-test milliseconds. The Windows time with the new default has **not been measured**.
@@ -133,12 +140,10 @@ CMake configure/build/ctest (no cmake); any Qt/GUI/viewport/screenshot test; int
 3. Is a non-Windows Editor/viewport ever required? (It would need a second renderer backend behind `DrawList`.)
 
 ## Next task (exact)
-**Owner (≈10 min): first compile of the Editor.** Follow `Editor/App/README.md`:
+**Owner (≈5 min), from the repo root in PowerShell:**
 ```
-cmake -S . -B Build/cmake -DKENGINE_BUILD_EDITOR_SPIKE=ON -DKENGINE_BUILD_EDITOR=ON -DCMAKE_PREFIX_PATH=D:/Qt/6.12.0/msvc2022_64
 cmake --build Build/cmake --config Debug
 ctest --test-dir Build/cmake -C Debug --output-on-failure
 ```
-Send back, verbatim: any compiler errors (expect a few small ones on first contact with real Qt), the ctest summary (expect 6 tests: unit, cli, png_probe, viewport_screenshot, editor_smoke, editor_screenshot; note the new `unit` duration), the `editor_smoke` check list if it fails, and the manual checklist answers from the README.
-**Then (me):** fix whatever the compile/smoke run shows; then M05-T09 final acceptance (Hello Cube in the real window), M0-T06 CI, and the remaining items: drag-and-drop reparent in the Explorer, composite commands (duplicate/paste), project manifest + `k create` (needs the JSON-vs-TOML decision), smaller JSON nodes (load memory ~15x file size).
-**Do not** build further Editor features before that first compile/run: everything in `Editor/App` is unverified.
+(`cmake --build` re-configures because `CMakeLists.txt` changed; no manual PATH needed any more.) Expect 6/6. If `editor_smoke` fails, paste its printed `[ OK ]/[FAIL]` list (or run `$env:PATH="D:\Qt\6.12.0\msvc2022_64\bin;$env:PATH"; .\Build\cmake\Editor\App\Debug\k_editor.exe --smoke`). Then run `k_editor.exe --demo` by hand and answer the checklist in `Editor/App/README.md`. Optional: the per-test milliseconds of the slowest unit tests (`.\Build\cmake\Debug\k_unit_tests.exe`, ~80 s) so I can cut the Windows run time further.
+**Then (me):** fix what the smoke/manual run shows; M05-T09 final acceptance; M0-T06 CI; Explorer drag-and-drop reparent; composite commands; project manifest + `k create`.
