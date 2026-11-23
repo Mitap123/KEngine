@@ -49,6 +49,7 @@ class HelpAndUsageTests(unittest.TestCase):
                 self.assertIn("k --version", r.stdout)
                 self.assertIn("k scene validate", r.stdout)
                 self.assertIn("k scene dump", r.stdout)
+                self.assertIn("--log-file", r.stdout)
                 # Commands from the roadmap that do not exist yet must not be advertised.
                 for unimplemented in ("create", "build", "run", "editor", "asset", "cook"):
                     self.assertNotRegex(r.stdout, rf"\bk {unimplemented}\b")
@@ -273,6 +274,191 @@ class SceneCommandTests(unittest.TestCase):
                 self.assertEqual(r.returncode, 2, msg=r.stdout + r.stderr)
                 self.assertEqual(r.stdout, "")
                 self.assertNotEqual(r.stderr, "")
+
+
+def run_bytes(*args):
+    """Like run() but takes raw byte arguments and returns undecoded output."""
+    return subprocess.run([cli_path().encode(), *args], capture_output=True, timeout=60)
+
+
+class LogFileTests(unittest.TestCase):
+    """`--log-file <path>`: JSON Lines, append, flushed per line, untrusted strings sanitised."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.dir = self._tmp.name
+        self.log = os.path.join(self.dir, "run.jsonl")
+
+    def scene(self, name="s.kscene", objects=None):
+        path = os.path.join(self.dir, name)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(scene_text(objects if objects is not None else [obj(A, "Root", "empty"), obj(B, "Cube", "cube", A)]))
+        return path
+
+    def records(self, path=None):
+        """Parse the log strictly: valid UTF-8, one JSON object per non-empty line, ending in a newline."""
+        with open(path or self.log, "rb") as f:
+            raw = f.read()
+        text = raw.decode("utf-8")  # strict: raises on invalid UTF-8
+        self.assertTrue(text.endswith("\n"), "log must end with a newline")
+        lines = text.split("\n")[:-1]
+        recs = []
+        for line in lines:
+            self.assertNotEqual(line, "")
+            rec = json.loads(line)
+            self.assertRegex(rec["ts"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+            self.assertIn(rec["level"], ("info", "warn", "error"))
+            recs.append(rec)
+        return recs
+
+    def events(self, path=None):
+        return [r["event"] for r in self.records(path)]
+
+    # ---- content ----
+    def test_validate_success_logs_start_result_finish_and_leaves_output_unchanged(self):
+        scene = self.scene()
+        plain = run("scene", "validate", scene)
+        logged = run("scene", "validate", scene, "--log-file", self.log)
+        self.assertEqual((logged.returncode, logged.stdout, logged.stderr), (plain.returncode, plain.stdout, plain.stderr))
+        recs = self.records()
+        self.assertEqual([r["event"] for r in recs], ["start", "result", "finish"])
+        self.assertEqual(recs[0]["args"], ["scene", "validate", scene])
+        self.assertRegex(recs[0]["version"], r"^\d+\.\d+\.\d+")
+        self.assertEqual((recs[1]["objects"], recs[1]["warnings"]), (2, 0))
+        self.assertEqual((recs[2]["ok"], recs[2]["exit_code"], recs[2]["level"]), (True, 0, "info"))
+
+    def test_json_mode_stdout_is_identical_with_and_without_a_log(self):
+        scene = self.scene()
+        a = run("scene", "validate", scene, "--json")
+        b = run("scene", "validate", scene, "--json", "--log-file", self.log)
+        self.assertEqual((a.returncode, a.stdout), (b.returncode, b.stdout))
+        c = run("scene", "dump", scene, "--json")
+        d = run("scene", "dump", scene, "--json", "--log-file", self.log)
+        self.assertEqual((c.returncode, c.stdout), (d.returncode, d.stdout))
+
+    def test_invalid_scene_logs_the_stable_error_code_and_exit_1(self):
+        bad = os.path.join(self.dir, "bad.kscene")
+        with open(bad, "w") as f:
+            f.write('{"schema":"kengine.scene","schema_ver')
+        r = run("scene", "validate", bad, "--json", "--log-file", self.log)
+        self.assertEqual(r.returncode, 1)
+        recs = self.records()
+        self.assertEqual([x["event"] for x in recs], ["start", "error", "finish"])
+        self.assertEqual(recs[1]["code"], json.loads(r.stdout)["error"]["code"])
+        self.assertEqual(recs[1]["level"], "error")
+        self.assertEqual((recs[2]["ok"], recs[2]["exit_code"], recs[2]["level"]), (False, 1, "error"))
+
+    def test_warnings_are_logged_individually(self):
+        path = self.scene("w.kscene", [obj(A, extra=',"postion":[1,2,3]')])
+        r = run("scene", "validate", path, "--log-file", self.log)
+        self.assertEqual(r.returncode, 0)
+        recs = self.records()
+        self.assertEqual([x["event"] for x in recs], ["start", "warning", "result", "finish"])
+        self.assertEqual(recs[1]["level"], "warn")
+        self.assertIn("postion", recs[1]["message"])
+        self.assertEqual(recs[2]["warnings"], 1)
+
+    def test_dump_and_doctor_are_logged_too(self):
+        run("scene", "dump", self.scene(), "--log-file", self.log)
+        self.assertEqual(self.events(), ["start", "result", "finish"])
+        os.remove(self.log)
+        r = run("doctor", "--log-file", self.log)
+        self.assertEqual(r.returncode, 0, msg=r.stdout)
+        recs = self.records()
+        self.assertEqual([x["event"] for x in recs], ["start"] + ["check"] * 3 + ["finish"])
+        self.assertTrue(all(x["ok"] and x["name"] and x["detail"] for x in recs[1:4]))
+
+    def test_the_log_is_appended_not_overwritten(self):
+        scene = self.scene()
+        run("scene", "validate", scene, "--log-file", self.log)
+        run("scene", "validate", scene, "--log-file", self.log)
+        self.assertEqual(self.events(), ["start", "result", "finish"] * 2)
+
+    def test_the_option_can_appear_anywhere_after_the_command(self):
+        scene = self.scene()
+        for args in (("scene", "--log-file", self.log, "validate", scene), ("scene", "validate", "--log-file", self.log, scene)):
+            with self.subTest(args=args):
+                if os.path.exists(self.log):
+                    os.remove(self.log)
+                self.assertEqual(run(*args).returncode, 0)
+                self.assertEqual(self.events(), ["start", "result", "finish"])
+
+    # ---- failure modes ----
+    def test_usage_errors_are_logged_with_exit_code_2(self):
+        r = run("scene", "bogus", "--log-file", self.log)
+        self.assertEqual(r.returncode, 2)
+        recs = self.records()
+        self.assertEqual([x["event"] for x in recs], ["start", "finish"])
+        self.assertEqual((recs[1]["exit_code"], recs[1]["ok"]), (2, False))
+
+    def test_bad_log_option_usage(self):
+        for args in (("doctor", "--log-file"), ("doctor", "--log-file", ""), ("doctor", "--log-file", "a", "--log-file", "b"),
+                     ("--version", "--log-file", self.log)):
+            with self.subTest(args=args):
+                r = run(*args)
+                self.assertEqual(r.returncode, 2, msg=r.stdout + r.stderr)
+                self.assertEqual(r.stdout, "")
+        self.assertFalse(os.path.exists(self.log))
+
+    def test_unopenable_log_stops_the_command_before_it_runs(self):
+        for bad in (self.dir, os.path.join(self.dir, "no", "such", "dir", "x.jsonl")):
+            with self.subTest(path=bad):
+                r = run("scene", "validate", self.scene(), "--log-file", bad)
+                self.assertEqual(r.returncode, 1)
+                self.assertEqual(r.stdout, "")             # the command did not run
+                self.assertIn("cannot open log file", r.stderr)
+
+    @unittest.skipUnless(os.path.exists("/dev/full"), "needs /dev/full (Linux)")
+    def test_a_failing_log_write_turns_success_into_exit_1(self):
+        r = run("scene", "validate", self.scene(), "--log-file", "/dev/full")
+        self.assertIn("OK:", r.stdout)                      # the command itself still reported its result
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("log", r.stderr)
+
+    # ---- untrusted text ----
+    @unittest.skipIf(os.name == "nt", "raw non-UTF-8 argv bytes are a POSIX thing")
+    def test_invalid_utf8_arguments_never_make_the_log_invalid(self):
+        bad_sequences = {
+            "stray high bytes": b"\xff\xfe",
+            "overlong 2-byte": b"\xc0\xaf",
+            "overlong 3-byte": b"\xe0\x80\xaf",
+            "encoded surrogate": b"\xed\xa0\x80",
+            "beyond U+10FFFF": b"\xf4\x90\x80\x80",
+            "truncated at the end": b"\xe2\x82",
+            "truncated 4-byte at the end": b"\xf0\x9f\x98",
+            "lone continuation byte": b"\x80",
+        }
+        for label, seq in bad_sequences.items():
+            with self.subTest(label):
+                if os.path.exists(self.log):
+                    os.remove(self.log)
+                path = os.fsencode(self.dir) + b"/a" + seq
+                r = run_bytes(b"scene", b"validate", path, b"--log-file", os.fsencode(self.log))
+                self.assertEqual(r.returncode, 1)                   # the file does not exist
+                recs = self.records()                               # strict UTF-8 decode inside
+                self.assertEqual([x["event"] for x in recs], ["start", "error", "finish"])
+                self.assertIn("\ufffd", recs[0]["args"][2])
+
+    @unittest.skipIf(os.name == "nt", "raw non-UTF-8 argv bytes are a POSIX thing")
+    def test_valid_multibyte_text_is_preserved_exactly(self):
+        text = "é€😀日本"   # 2, 3, 4 and 3-byte sequences
+        path = os.fsencode(self.dir) + b"/" + text.encode("utf-8")
+        r = run_bytes(b"scene", b"validate", path, b"--log-file", os.fsencode(self.log))
+        self.assertEqual(r.returncode, 1)
+        recs = self.records()
+        self.assertTrue(recs[0]["args"][2].endswith("/" + text))
+        self.assertNotIn("\ufffd", recs[0]["args"][2])
+
+    def test_newlines_and_control_characters_in_names_cannot_forge_log_lines(self):
+        evil = os.path.join(self.dir, "a\nb\x1b[31m\"x.kscene")
+        r = run("scene", "validate", evil, "--log-file", self.log)
+        self.assertEqual(r.returncode, 1)
+        with open(self.log, "rb") as f:
+            lines = f.read().split(b"\n")
+        self.assertEqual(len(lines), 4)                      # start, error, finish + the empty tail
+        self.assertEqual([json.loads(x)["event"] for x in lines[:3]], ["start", "error", "finish"])
+        self.assertIn("a\nb\x1b[31m\"x.kscene", json.loads(lines[0])["args"][2])  # content preserved, only escaped
 
 
 if __name__ == "__main__":

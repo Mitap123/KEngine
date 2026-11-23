@@ -22,7 +22,7 @@ Editor/Spike (Windows: Qt Widgets + Direct3D 11, UNVERIFIED) ─┘
 | Editor core (Qt-free) | `Editor/Core` | `EditorDocument` (file, selection by UUID, edits, Play), Explorer rows, Inspector axis helpers, play demo, camera "Frame All", demo scene. Unit-tested. |
 | Editor app (Windows, Qt 6 Widgets + Direct3D 11) | `Editor/App` | `k_editor`: MainWindow, EditorViewport. Thin binding of widgets to `EditorDocument`. **Never compiled with real Qt yet.** Renderer source shared from `Editor/Spike` |
 | Editing | `Engine/Editing` | `Command`/`CommandHistory` (undo/redo, merge, dirty tracking), UUID-addressed scene commands, `SceneEditor` (document model: edits, save/open, isolated Play). The Editor UI talks only to this. ADR-0011 |
-| CLI | `Tools/CLI` | `k --version`, `k --help`, `k doctor [--json]` (build facts + engine self-checks), `k scene validate|dump <file> [--json]` |
+| CLI | `Tools/CLI` | `k --version`, `k --help`, `k doctor [--json]` (build facts + engine self-checks), `k scene validate|dump <file> [--json]`; `doctor` and `scene` take `--log-file <path>` (JSON Lines run log, append, flushed per line) |
 
 ## Invariants enforced by code and tests
 - UUIDs are unique per scene and never nil; handles never resolve after destroy/slot reuse; generation exhaustion retires a slot.

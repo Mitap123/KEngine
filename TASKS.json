@@ -571,7 +571,7 @@
             "Tools/CLI/main.cpp",
             "Tests/CLI/test_cli.py"
           ],
-          "notes": "Done: `k scene validate` and `k scene dump [--json]` (stable codes, exit 1 on invalid, machine-readable JSON, escaped terminal output). Not done: structured log file output and the screenshot/visual probe (blocked on the verified Direct3D path, M05-T03b); no project-level (not just scene) validation yet."
+          "notes": "Done: `k scene validate` and `k scene dump [--json]` (stable codes, exit 1 on invalid, machine-readable JSON, escaped terminal output). 2026-11-23: structured log output done (`--log-file`, JSON Lines; Linux-tested). Not done: the screenshot/visual probe (blocked on the verified Direct3D path, M05-T03b); no project-level (not just scene) validation yet."
         },
         {
           "id": "M05-T09",

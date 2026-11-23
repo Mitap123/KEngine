@@ -38,7 +38,7 @@ Build K Engine incrementally as a reliable, modular game engine and Editor. Read
 make STRICT=1 check               # build (warnings = errors) + unit tests + CLI tests
 make SANITIZE=1 STRICT=1 check    # same under ASan + UBSan
 make BUILD_TYPE=Release check
-Build/make-debug/k scene validate <file>   # CLI: exit 1 on invalid scene; `k scene dump <file> [--json]`
+Build/make-debug/k scene validate <file>   # CLI: exit 1 on invalid scene; `k scene dump <file> [--json]`; add `--log-file run.jsonl` to `doctor`/`scene` for a JSON Lines run log
 Build/make-debug/k_unit_tests <substring>   # run matching unit cases (--list to list)
 ```
 CMake is written but UNVERIFIED (no cmake in the original dev environment); see BUILDING.md and ADR-0009. Do not claim a command works unless it appears here or in BUILDING.md/TESTING.md.

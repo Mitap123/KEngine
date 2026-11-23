@@ -6,14 +6,18 @@
 //   k doctor [--json]
 //   k scene validate <file> [--json]
 //   k scene dump <file> [--json]
+//   (doctor and scene also accept --log-file <path>: JSON Lines log, see write_log below)
 //
 // Exit codes: 0 success; 1 a command ran and reported failure (doctor check
 // failed, scene file invalid); 2 usage error (unknown command/flag). Results go
 // to stdout, error and warning diagnostics go to stderr (with --json, scene
 // errors are reported as JSON on stdout instead).
+#include <cerrno>
 #include <charconv>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -41,11 +45,107 @@ void print_usage(std::FILE* out) {
         "  k doctor [--json]  report build/platform facts and run engine self-checks\n"
         "  k scene validate <file> [--json]  check a scene file; exit 1 if it is invalid\n"
         "  k scene dump <file> [--json]      print the scene tree (or canonical JSON)\n"
+        "  --log-file <path>  (doctor, scene) append a JSON Lines log of this run to <path>\n"
         "  k --help           show this help\n"
         "\n"
         "exit codes: 0 ok, 1 command failed, 2 usage error\n",
         out);
 }
+
+// -------------------------------------------------------------------- log ---
+//
+// `--log-file <path>` appends one compact JSON object per line (JSON Lines) per event:
+//   {"ts":"2026-11-23T12:00:00Z","level":"info|warn|error","event":"start|check|warning|error|result|finish",...}
+// Every line is flushed as it is written, so a crash still leaves the earlier lines. The file is
+// opened (append) before the command runs; if that fails the command does not run (exit 1).
+// If a write fails later (disk full) the run exits 1 even if the command succeeded.
+// Usage errors (exit 2) are logged too (start, finish with exit_code 2), since the log is opened
+// first. Strings are sanitised to valid UTF-8 (bad bytes become U+FFFD): file names and quoted file
+// content are untrusted and must not make a log line invalid JSON.
+
+std::string utf8_sanitized(const std::string& in) {
+    std::string out;
+    out.reserve(in.size());
+    std::size_t i = 0;
+    while (i < in.size()) {
+        const auto b = static_cast<unsigned char>(in[i]);
+        std::size_t len = 0;
+        std::uint32_t cp = 0;
+        if (b < 0x80) { len = 1; cp = b; }
+        else if (b >= 0xC2 && b <= 0xDF) { len = 2; cp = b & 0x1Fu; }
+        else if (b >= 0xE0 && b <= 0xEF) { len = 3; cp = b & 0x0Fu; }
+        else if (b >= 0xF0 && b <= 0xF4) { len = 4; cp = b & 0x07u; }
+        bool ok = len != 0 && i + len <= in.size();
+        for (std::size_t j = 1; ok && j < len; ++j) {
+            const auto c = static_cast<unsigned char>(in[i + j]);
+            if ((c & 0xC0u) != 0x80u) ok = false;
+            else cp = (cp << 6) | (c & 0x3Fu);
+        }
+        if (ok && ((len == 3 && cp < 0x800) || (len == 4 && cp < 0x10000) || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))) ok = false;
+        if (ok) {
+            out.append(in, i, len);
+            i += len;
+        } else {
+            out += "\xEF\xBF\xBD";  // U+FFFD, one per bad byte
+            ++i;
+        }
+    }
+    return out;
+}
+
+k::Json jstr(const std::string& s) { return k::Json::string(utf8_sanitized(s)); }
+
+std::string utc_timestamp() {
+    const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm tm{};
+#if defined(_WIN32)
+    gmtime_s(&tm, &now);
+#else
+    gmtime_r(&now, &tm);
+#endif
+    char buf[32];
+    std::strftime(buf, sizeof buf, "%Y-%m-%dT%H:%M:%SZ", &tm);
+    return buf;
+}
+
+class Log {
+public:
+    Log() = default;
+    Log(const Log&) = delete;
+    Log& operator=(const Log&) = delete;
+    ~Log() {
+        if (f_) std::fclose(f_);
+    }
+    bool open(const std::string& path) {
+        f_ = std::fopen(path.c_str(), "ab");
+        return f_ != nullptr;
+    }
+    bool failed() const { return failed_; }
+
+    // No-op unless a log file is open. `fields` must be an object; its members follow ts/level/event.
+    void write(const char* level, const char* event, const k::Json& fields = k::Json::object()) {
+        if (!f_) return;
+        k::Json line = k::Json::object();
+        line.set("ts", k::Json::string(utc_timestamp()));
+        line.set("level", k::Json::string(level));
+        line.set("event", k::Json::string(event));
+        for (const auto& member : fields.members()) line.set(member.first, member.second);
+        const auto text = line.dump();  // compact: control characters are escaped, so this is one line
+        if (!text) {
+            failed_ = true;
+            return;
+        }
+        const std::string& t = text.value();
+        if (std::fwrite(t.data(), 1, t.size(), f_) != t.size() || std::fputc('\n', f_) == EOF || std::fflush(f_) != 0)
+            failed_ = true;
+    }
+
+private:
+    std::FILE* f_ = nullptr;
+    bool failed_ = false;
+};
+
+Log g_log;
 
 // ------------------------------------------------------------- build facts ---
 
@@ -166,7 +266,14 @@ std::vector<Check> run_checks() { return {check_uuid(), check_handles(), check_s
 int run_doctor(bool json) {
     const std::vector<Check> checks = run_checks();
     bool all_ok = true;
-    for (const Check& c : checks) all_ok = all_ok && c.ok;
+    for (const Check& c : checks) {
+        all_ok = all_ok && c.ok;
+        k::Json f = k::Json::object();
+        f.set("name", jstr(c.name));
+        f.set("ok", k::Json::boolean(c.ok));
+        f.set("detail", jstr(c.detail));
+        g_log.write(c.ok ? "info" : "error", "check", f);
+    }
 
     if (json) {
         k::Json root = k::Json::object();
@@ -257,6 +364,12 @@ std::string vec_text(const k::Vec3& v) {
 }
 
 int report_scene_error(const k::Error& e, bool json) {
+    {
+        k::Json f = k::Json::object();
+        f.set("code", jstr(e.code));
+        f.set("message", jstr(e.message));
+        g_log.write("error", "error", f);
+    }
     if (json) {
         k::Json err = k::Json::object();
         err.set("code", k::Json::string(e.code));
@@ -306,6 +419,17 @@ int run_scene(int argc, char** argv) {
     if (!loaded) return report_scene_error(loaded.error(), json);
     const k::Scene& scene = loaded.value().scene;
     const auto& warnings = loaded.value().warnings;
+    for (const auto& msg : warnings) {
+        k::Json f = k::Json::object();
+        f.set("message", jstr(msg));
+        g_log.write("warn", "warning", f);
+    }
+    {
+        k::Json f = k::Json::object();
+        f.set("objects", k::Json::number(static_cast<double>(scene.object_count())));
+        f.set("warnings", k::Json::number(static_cast<double>(warnings.size())));
+        g_log.write("info", "result", f);
+    }
 
     if (sub == "validate") {
         if (json) {
@@ -364,20 +488,61 @@ int main(int argc, char** argv) {
         print_usage(stdout);
         return kExitOk;
     }
-    if (cmd == "doctor") {
-        bool json = false;
+    if (cmd == "doctor" || cmd == "scene") {
+        // Take --log-file <path> out of the arguments; the command parsers never see it.
+        std::vector<char*> args{argv[0], argv[1]};
+        std::string log_path;
+        bool have_log = false;
         for (int i = 2; i < argc; ++i) {
-            if (std::strcmp(argv[i], "--json") == 0) {
-                json = true;
-            } else {
-                std::fprintf(stderr, "k: doctor: unknown option '%s'\n", argv[i]);
-                return kExitUsage;
+            if (std::strcmp(argv[i], "--log-file") != 0) {
+                args.push_back(argv[i]);
+                continue;
             }
+            if (have_log) { std::fputs("k: --log-file given twice\n", stderr); return kExitUsage; }
+            if (i + 1 >= argc || argv[i + 1][0] == '\0') { std::fputs("k: --log-file needs a <path>\n", stderr); return kExitUsage; }
+            log_path = argv[++i];
+            have_log = true;
         }
-        return run_doctor(json);
-    }
+        if (have_log && !g_log.open(log_path)) {
+            std::fprintf(stderr, "k: cannot open log file '%s': %s\n", printable(log_path).c_str(), std::strerror(errno));
+            return kExitFailure;
+        }
 
-    if (cmd == "scene") return run_scene(argc, argv);
+        {
+            k::Json f = k::Json::object();
+            f.set("version", k::Json::string(k::kEngineVersion));
+            k::Json a = k::Json::array();
+            for (std::size_t i = 1; i < args.size(); ++i) a.push_back(jstr(args[i]));  // command words and arguments
+            f.set("args", std::move(a));
+            g_log.write("info", "start", f);
+        }
+        int code = kExitOk;
+        if (cmd == "doctor") {
+            bool json = false;
+            for (std::size_t i = 2; i < args.size() && code == kExitOk; ++i) {
+                if (std::strcmp(args[i], "--json") == 0) {
+                    json = true;
+                } else {
+                    std::fprintf(stderr, "k: doctor: unknown option '%s'\n", args[i]);
+                    code = kExitUsage;
+                }
+            }
+            if (code == kExitOk) code = run_doctor(json);
+        } else {
+            code = run_scene(static_cast<int>(args.size()), args.data());
+        }
+        {
+            k::Json f = k::Json::object();
+            f.set("ok", k::Json::boolean(code == kExitOk));
+            f.set("exit_code", k::Json::number(code));
+            g_log.write(code == kExitOk ? "info" : "error", "finish", f);
+        }
+        if (g_log.failed()) {
+            std::fputs("k: writing the log file failed; the log is incomplete\n", stderr);
+            return code == kExitOk ? kExitFailure : code;
+        }
+        return code;
+    }
 
     std::fprintf(stderr, "k: unknown command '%s' (try 'k --help')\n", cmd.c_str());
     return kExitUsage;

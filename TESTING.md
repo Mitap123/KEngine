@@ -6,7 +6,7 @@ Reports must distinguish **passed / failed / skipped / not-run**. The unit runne
 | Layer | Location | Command | What it covers |
 |---|---|---|---|
 | Unit | `Tests/Unit/*.cpp` (in-repo `KTEST` harness) | `make test` | UUID, handles/SlotMap (+ typed-handle compile-time checks), Scene, JSON, scene serialization, scene file I/O, math, world transforms, primitive meshes, orbit camera, picking, draw list, command history/undo-redo, SceneEditor, Play isolation (temp dirs under the system temp path, removed after each test) |
-| CLI | `Tests/CLI/test_cli.py` (Python `unittest`) | `make cli-test` | `k --version`, `--help`, `doctor` (+`--json`), `scene validate`/`dump` (valid, invalid, hostile, deep files), usage errors, exit codes |
+| CLI | `Tests/CLI/test_cli.py` (Python `unittest`) | `make cli-test` | `k --version`, `--help`, `doctor` (+`--json`), `scene validate`/`dump` (valid, invalid, hostile, deep files), usage errors, exit codes, and `--log-file` (event sequence, append, usage/failed-open/failed-write behaviour, output unchanged by logging, invalid-UTF-8 and control characters in names cannot corrupt or forge log lines; the failed-write case uses `/dev/full` and is skipped where it does not exist) |
 | Sanitizers | same tests | `make SANITIZE=1 check` | ASan + UBSan on all of the above |
 
 **Fast vs full unit tests:** by default the heavy tests use reduced sizes (the first Windows Debug run took 311 s; Linux Debug was 35 s, now 4.3 s). `KENGINE_TEST_FULL=1` (`make check-full`, or `-DKENGINE_FULL_TESTS=ON` and ctest `unit_full`) runs the full sizes: 100,000-object hierarchies, full fuzz sweeps, 1,500-step undo model. Run the full mode before a release or after touching loading/hierarchy code. The runner prints per-test milliseconds.
