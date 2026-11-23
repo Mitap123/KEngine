@@ -137,6 +137,40 @@ Status EditorDocument::set_selected_transform(const Transform& transform, bool m
     return editor_.set_transform(selected_, transform, merge);
 }
 
+Status EditorDocument::can_reparent(const Uuid& id, const Uuid& new_parent) const {
+    if (playing())
+        return make_error("editor.read_only_while_playing", "the scene cannot be edited while Play is running; stop first");
+    const Scene& sc = editor_.scene();
+    const ObjectHandle h = sc.find_by_uuid(id);
+    if (h.is_null()) return make_error("command.object_not_found", "no object with UUID " + id.to_string() + " in the scene");
+    if (new_parent.is_nil()) return Status::success();
+    const ObjectHandle p = sc.find_by_uuid(new_parent);
+    if (p.is_null())
+        return make_error("command.object_not_found", "no object with UUID " + new_parent.to_string() + " in the scene");
+    for (ObjectHandle cur = p; !cur.is_null();) {  // walk up from the target: is `h` an ancestor (or the target)?
+        if (cur == h) return make_error("scene.cycle", "an object cannot be moved into itself or its own descendants");
+        const SceneObject* o = sc.get(cur);
+        cur = o ? o->parent : kNullObjectHandle;
+    }
+    return Status::success();
+}
+
+Status EditorDocument::reparent(const Uuid& id, const Uuid& new_parent, std::size_t sibling_index, ReparentMode mode) {
+    if (Status st = can_reparent(id, new_parent); !st) return st;
+
+    // Same parent and the index it already has: nothing to do, and no empty undo step.
+    const Scene& sc = editor_.scene();
+    const ObjectHandle h = sc.find_by_uuid(id);
+    const SceneObject* o = sc.get(h);
+    const SceneObject* cur_parent = sc.get(o->parent);
+    if ((cur_parent ? cur_parent->id : Uuid()) == new_parent) {
+        const std::size_t siblings = cur_parent ? cur_parent->children.size() : sc.roots().size();
+        const std::size_t target = sibling_index < siblings ? sibling_index : siblings - 1;
+        if (sc.sibling_index(h).value_or(siblings) == target) return Status::success();
+    }
+    return editor_.reparent(id, new_parent, sibling_index, mode);
+}
+
 Status EditorDocument::undo() {
     Status st = editor_.undo();
     sanitize_selection();

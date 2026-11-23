@@ -426,7 +426,7 @@
           "out_of_scope": [
             "Advanced multi-select gizmo behavior"
           ],
-          "notes": "Selection (Explorer and viewport click) and Inspector transform/name editing are implemented in Editor/Core + Editor/App; the core is tested, the UI binding is unverified until the first Qt compile/run."
+          "notes": "Selection (Explorer and viewport click) and Inspector transform/name editing are implemented in Editor/Core + Editor/App; the core is tested, the UI binding is unverified until the first Qt compile/run. Reparent for Explorer drag-and-drop exists in the core (EditorDocument::reparent/can_reparent, tested); the Qt drag/drop binding is not written."
         },
         {
           "id": "M05-T05",
@@ -494,9 +494,10 @@
           "evidence": [
             "Engine/Editing/*",
             "Tests/Unit/test_commands.cpp",
-            "Documentation/ADR/0011-editing-model-commands-history-play.md"
+            "Documentation/ADR/0011-editing-model-commands-history-play.md",
+            "Tests/Unit/test_reparent.cpp"
           ],
-          "notes": "Engine side done and tested (create/delete subtree/transform/rename/reparent, merge, dirty tracking, no dangling handles because commands use UUIDs). Remaining: wiring into the Editor UI (menu/shortcuts, selection by UUID, gesture end on mouse release) - depends on M05-T01/T04."
+          "notes": "Engine side done and tested (create/delete subtree/transform/rename/reparent, merge, dirty tracking, no dangling handles because commands use UUIDs). Remaining: wiring into the Editor UI (menu/shortcuts, selection by UUID, gesture end on mouse release) - depends on M05-T01/T04. 2026-11-23: reparent gained a sibling index and a KeepWorld mode (Engine/Editing, decompose_trs in Engine/Scene) and EditorDocument::reparent/can_reparent (the Qt-free entry points for Explorer drag-and-drop); 12 new tests, 10/10 injected bugs caught. No Explorer drag-and-drop UI yet."
         },
         {
           "id": "M05-T07",

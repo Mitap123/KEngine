@@ -20,9 +20,11 @@ New project (no pre-existing repository). Session 1 established the control docu
 
 Consequence: CMake/Qt/Rust/GPU work cannot be built or verified here. Work that does not need them proceeded.
 
-## Session 9 (2026-11-23): Linux re-verification + CI workflow (no Windows/Qt access)
+## Session 9 (2026-11-23): Linux re-verification, CI workflow, reparent core (no Windows/Qt access)
 **Re-verified on the final session-8 tree (Linux, GCC 13.3, 1 core):** `make STRICT=1 check` exit 0 (22 s incl. build of the rest); `make SANITIZE=1 STRICT=1 check` exit 0 (48 s, no sanitizer report; first ASan+UBSan run since the Editor core was added); `make BUILD_TYPE=Release STRICT=1 check` exit 0; `make BUILD_TYPE=Release STRICT=1 check-full` exit 0. Every run: unit 152/152 (not_run=0), CLI 21 OK, visual self-test 8 OK.
 **CI (M0-T06, partial):** added `.github/workflows/ci.yml`. `linux-core` (ubuntu-24.04) runs the three make configurations above; `windows-core` (windows-2022) runs CMake configure/build (Debug)/ctest without Qt, which also exercises the CMake route's portable part. Logs are uploaded as artifacts (always). Checked only that the YAML parses (PyYAML); **not run on GitHub**, so the Windows job (default generator, runtime) is unverified. Not claimed: any other OS/compiler, Editor or GPU tests in CI.
+**Reparent for Explorer drag-and-drop (Qt-free core, M05-T04/T06):** `Scene` already supported a sibling index; the command now takes it and a `ReparentMode` (`KeepLocal` | `KeepWorld`). New `decompose_trs(Mat4)` (Engine/Scene) splits a matrix into position/Euler/scale and proves the split by recomposing. `EditorDocument::reparent` (default KeepWorld, no-op guard, selection kept) and `can_reparent` (hover feedback: cycle / not found / playing). A KeepWorld move that needs shear is rejected, never approximated (decision recorded in ADR-0011). **Verification:** unit 152 -> 164, all pass in Debug STRICT, ASan+UBSan and Release `check-full`; CLI 21 and visual 8 unchanged. 10 deliberately injected bugs were each caught by a test (3 first attempts did not compile under -Werror and were redone). **Not done:** the Qt drag/drop binding in `Editor/App` (cannot be compiled here), so none of this is visible in the Editor yet.
+**Not verified on MSVC:** the new reparent code and tests compile warning-clean on GCC only; the first Windows `cmake --build` is the check.
 **Not done / still unknown:** everything under "Next task" (owner's Windows run and the Editor manual checklist) is unchanged.
 **Process note:** the first background build died with its shell (no exit line); reran detached, results above are from the reruns.
 
@@ -152,4 +154,4 @@ cmake --build Build/cmake --config Debug
 ctest --test-dir Build/cmake -C Debug --output-on-failure
 ```
 (`cmake --build` re-configures because `CMakeLists.txt` changed; no manual PATH needed any more.) Expect 6/6. If `editor_smoke` fails, paste its printed `[ OK ]/[FAIL]` list (or run `$env:PATH="D:\Qt\6.12.0\msvc2022_64\bin;$env:PATH"; .\Build\cmake\Editor\App\Debug\k_editor.exe --smoke`). Then run `k_editor.exe --demo` by hand and answer the checklist in `Editor/App/README.md`. Optional: the per-test milliseconds of the slowest unit tests (`.\Build\cmake\Debug\k_unit_tests.exe`, ~80 s) so I can cut the Windows run time further.
-**Then (me):** fix what the smoke/manual run shows; M05-T09 final acceptance; M0-T06 CI (first GitHub run + record it in BUILDING.md); Explorer drag-and-drop reparent; composite commands; project manifest + `k create`.
+**Then (me):** fix what the smoke/manual run shows; M05-T09 final acceptance; M0-T06 CI (first GitHub run + record it in BUILDING.md); Explorer drag-and-drop reparent (core done; Qt binding left); composite commands; project manifest + `k create`.

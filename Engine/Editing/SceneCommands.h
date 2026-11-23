@@ -25,8 +25,25 @@ std::unique_ptr<Command> make_set_transform_command(const Uuid& id, const Transf
 
 std::unique_ptr<Command> make_rename_command(const Uuid& id, std::string new_name);
 
-// Moves the object under `new_parent` (nil = root) as its last child. Undo
-// restores the old parent and the old sibling position.
-std::unique_ptr<Command> make_reparent_command(const Uuid& id, const Uuid& new_parent);
+// What a reparent does to the moved object's Transform (which is local to its parent).
+enum class ReparentMode {
+    KeepLocal,  // transform numbers unchanged; the object may visibly jump
+    KeepWorld,  // transform recomputed so the object (and its subtree) stays where it is
+};
+
+// Moves the object under `new_parent` (nil = root) at `sibling_index` among the new siblings
+// counted after the object has been removed from its old position (Scene::kAppend, or any
+// index >= the sibling count, = last; the same parent therefore reorders). Undo restores the
+// old parent, the old sibling position and, for KeepWorld, the exact old transform.
+//
+// KeepWorld errors (the scene is left unchanged): command.singular_parent_transform (the new
+// parent's world matrix cannot be inverted, e.g. a zero scale) and
+// command.world_transform_not_representable (the needed local matrix has shear, which
+// position/Euler/scale cannot express: a rotated object under a non-uniformly scaled parent).
+// A KeepWorld move that does not change the object's world matrix leaves its transform bytes
+// untouched. Other errors: command.object_not_found, scene.cycle.
+std::unique_ptr<Command> make_reparent_command(const Uuid& id, const Uuid& new_parent,
+                                               std::size_t sibling_index = Scene::kAppend,
+                                               ReparentMode mode = ReparentMode::KeepLocal);
 
 }  // namespace k

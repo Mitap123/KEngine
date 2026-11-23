@@ -26,6 +26,7 @@
 #include <string>
 
 #include "Engine/Editing/CommandHistory.h"
+#include "Engine/Editing/SceneCommands.h"
 #include "Engine/Serialization/SceneFile.h"
 
 namespace k {
@@ -53,7 +54,10 @@ public:
     // `merge`: coalesce with the previous merge-enabled transform edit (a drag).
     Status set_transform(const Uuid& id, const Transform& transform, bool merge = false);
     Status rename(const Uuid& id, std::string name);
-    Status reparent(const Uuid& id, const Uuid& new_parent);
+    // See make_reparent_command() for the index and mode semantics. The default keeps the
+    // transform numbers (engine behaviour before KeepWorld existed).
+    Status reparent(const Uuid& id, const Uuid& new_parent, std::size_t sibling_index = Scene::kAppend,
+                    ReparentMode mode = ReparentMode::KeepLocal);
 
     // Call when a drag/gesture ends so the next edit starts a new undo step.
     void end_edit_gesture() { history_.break_merge(); }

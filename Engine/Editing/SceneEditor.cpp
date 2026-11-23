@@ -47,9 +47,9 @@ Status SceneEditor::rename(const Uuid& id, std::string name) {
     return history_.execute(scene_, make_rename_command(id, std::move(name)));
 }
 
-Status SceneEditor::reparent(const Uuid& id, const Uuid& new_parent) {
+Status SceneEditor::reparent(const Uuid& id, const Uuid& new_parent, std::size_t sibling_index, ReparentMode mode) {
     if (Status st = refuse_if_playing(); !st) return st;
-    return history_.execute(scene_, make_reparent_command(id, new_parent));
+    return history_.execute(scene_, make_reparent_command(id, new_parent, sibling_index, mode));
 }
 
 Status SceneEditor::undo() {

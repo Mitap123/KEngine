@@ -30,6 +30,7 @@ Statuses: PLANNED, PROTOTYPE, IMPLEMENTED, TESTED, STABLE, BLOCKED. Each status 
 | Windows scene-file save path (CreateFileW + FlushFileBuffers + MoveFileExW) | TESTED | owner's rerun: `unit` 135/135 on Windows 10 (MSVC Debug), incl. fault injection at every stage; real disk-full/power-loss not tested |
 | Selection sync, transform editing UI | BLOCKED | depends on Editor shell |
 | Undo/redo for create/delete(subtree)/transform/rename/reparent, merge of drags, dirty tracking (`SceneEditor`, Qt-free) | TESTED | `test_commands.cpp` incl. randomized snapshot-model check; 14+ mutation checks. No UI yet |
+| Reparent with sibling index and keep-world-transform (`decompose_trs`, `EditorDocument::reparent/can_reparent`, Qt-free); shear/zero-scale cases are rejected, not approximated | TESTED (core only) | `test_reparent.cpp`: round trips incl. gimbal poles and reflections, randomized 600-step world-preservation + exact-undo check, 10/10 injected bugs caught. **No Explorer drag-and-drop UI exists** |
 | Play/Stop isolation (value copy of the authoring scene; edits/undo blocked while playing) | TESTED | `test_commands.cpp` (`play_*`, 500 repeated sessions). Engine-side only: no runtime loop, no Editor buttons yet |
 | CLI `k scene validate <file>` and `k scene dump <file> [--json]` (stable error codes, exit codes, escaped terminal output) | TESTED | `Tests/CLI/test_cli.py`; 3 CLI mutation checks |
 | CLI screenshot / visual probe | BLOCKED | needs the verified Direct3D path (M05-T03b) |

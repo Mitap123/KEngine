@@ -69,6 +69,20 @@ public:
     Status set_selected_transform(const Transform& transform, bool merge = false);
     void end_edit_gesture() { editor_.end_edit_gesture(); }
 
+    // Moves `id` under `new_parent` (nil = root) at `sibling_index` among the new siblings,
+    // counted after the object is removed from its old spot (Scene::kAppend = last; the same
+    // parent reorders). This is what an Explorer drag-and-drop calls. One undo step; the
+    // selection is kept (it is a UUID). Defaults to KeepWorld so the object does not jump.
+    // A move that would leave the object exactly where it is succeeds without an undo step.
+    // Errors: see can_reparent() and make_reparent_command() (KeepWorld errors).
+    Status reparent(const Uuid& id, const Uuid& new_parent, std::size_t sibling_index = Scene::kAppend,
+                    ReparentMode mode = ReparentMode::KeepWorld);
+    // Would a drop of `id` on `new_parent` be accepted? Lets the UI refuse a target while the
+    // user hovers, without changing anything. Ok, or editor.read_only_while_playing,
+    // command.object_not_found, scene.cycle (onto itself or into its own subtree). It does not
+    // predict the KeepWorld shear/singular errors; those only show when the move is tried.
+    Status can_reparent(const Uuid& id, const Uuid& new_parent) const;
+
     Status undo();
     Status redo();
     bool can_undo() const { return editor_.can_undo(); }
