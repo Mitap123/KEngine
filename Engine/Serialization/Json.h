@@ -8,7 +8,7 @@
 // Parser policy (all violations are errors, never silently accepted):
 //   * No comments, no trailing commas, no NaN/Infinity, no leading zeros.
 //   * Strings must be valid UTF-8; control characters must be escaped;
-//     \u escapes (incl. surrogate pairs) are decoded to UTF-8; lone
+//     backslash-u escapes (incl. surrogate pairs) are decoded to UTF-8; lone
 //     surrogates are rejected.
 //   * Duplicate object keys are rejected (hash-based, so a hostile object with
 //     hundreds of thousands of keys is handled in linear time).

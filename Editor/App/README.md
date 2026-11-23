@@ -1,13 +1,13 @@
 # k_editor — the K Engine Editor (M0.5) — FIRST COMPILE PENDING
 
-**Status (2026-11-19):** **compiled and linked cleanly with real Qt 6.12 / MSVC 19.51** on the owner's machine. **Behaviour not observed yet**: the automated tests could not start (Qt DLLs not on PATH, exit 0xC0000135) and the manual checklist below is still pending. The Qt-free logic behind it (`Editor/Core`) is unit-tested on Linux (152 unit tests).
+**Status (2026-11-19):** **compiled and linked cleanly with real Qt 6.12 / MSVC 19.51** on the owner's machine. **Update 2026-11-23:** `ctest` passes 6/6 and `k_editor --smoke` reports 40 checks, 0 failed on the owner's machine. **Interactive behaviour (real mouse use, appearance) is still not observed**; the manual checklist below is still pending. The Qt-free logic behind it (`Editor/Core`) is unit-tested on Linux (152 unit tests).
 
 ## What it is
 Qt 6 Widgets window: menus + toolbar (File / Edit / Create / View / Play), Explorer (hierarchy tree), Inspector (name, kind, UUID, position / rotation / scale), Console, and the Direct3D 11 viewport shared with the spike (`Editor/Spike/D3D11Renderer.*`). Every action goes through `EditorDocument` (`Editor/Core`).
 Viewport: left-drag orbit, right/middle-drag or Shift+left-drag pan, wheel zoom, click selects (orange), click empty space clears, `F` = Frame All.
 Keys: Ctrl+N/O/S, Ctrl+Shift+S, Ctrl+Z / redo, Delete, F5 = Play, Shift+F5 = Stop.
 Play runs a demo on a **copy** of the scene (cubes and spheres spin); editing is locked; Stop restores the authored scene exactly.
-Limits: Inspector scale cannot go below 0.001; Explorer drag-and-drop reparenting and Edit > Duplicate (Ctrl+D) were written on 2026-11-23 but have **never been compiled or run** (see the checklist); no multi-select; no paste; no grid/gizmos; objects are created at the origin under the root.
+Limits: Inspector scale cannot go below 0.001; Explorer drag-and-drop reparenting and Edit > Duplicate (Ctrl+D) were written on 2026-11-23: compiled, and their document-level paths pass `--smoke`, but a **real mouse drag has not been tried** (see the checklist); no multi-select; no paste; no grid/gizmos; objects are created at the origin under the root.
 
 ## Build (Windows 10/11, same environment that built the spike)
 ```

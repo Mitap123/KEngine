@@ -87,7 +87,7 @@ KTEST(robustness_json_duplicate_keys_are_detected_on_both_detection_paths) {
         KCHECK(!Json::parse(dup_mid + ",\"k" + std::to_string(n / 2) + "\":1}").ok());     // repeats a middle key
     }
     // Keys that differ only slightly are not duplicates.
-    KCHECK(Json::parse(R"({"a":1,"A":2,"a ":3," a":4,"a\u0000":5})").ok());
+    KCHECK(Json::parse("{\"a\":1,\"A\":2,\"a \":3,\" a\":4,\"a\\u0000\":5}").ok());
     // Duplicates are found even when the first copy sits inside the "hashed" region
     // and a later non-duplicate insertion happened in between.
     std::string t = "{";
@@ -247,7 +247,7 @@ std::vector<std::string> seeds() {
         R"({"id":"11111111-1111-4111-8111-111111111111","name":"n","kind":"cube","parent":null,"x":true,)"
         R"("transform":{"position":[1,2,3],"skew":[0]}},)"
         R"({"id":"22222222-2222-4222-8222-222222222222","name":"c","kind":"empty","parent":"11111111-1111-4111-8111-111111111111"}]})",
-        R"({"a":[1,-2.5e3,true,false,null,"\u00e9\ud83d\ude00\n"],"b":{"c":{"d":[]}}})",
+        "{\"a\":[1,-2.5e3,true,false,null,\"\\u00e9\\ud83d\\ude00\\n\"],\"b\":{\"c\":{\"d\":[]}}}",
     };
 }
 

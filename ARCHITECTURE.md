@@ -20,7 +20,7 @@ Editor/Spike (Windows: Qt Widgets + Direct3D 11, UNVERIFIED) ─┘
 | Scene transforms | `Engine/Scene/SceneTransforms` | local/world matrices (iterative, any depth) |
 | Rendering (API-neutral) | `Engine/Rendering` | primitive meshes, `OrbitCamera` (+screen rays), CPU `pick`, `DrawList` (the only thing a renderer consumes). No graphics API, no Qt |
 | Editor core (Qt-free) | `Editor/Core` | `EditorDocument` (file, selection by UUID, edits, Play), Explorer rows, Inspector axis helpers, play demo, camera "Frame All", demo scene. Unit-tested. |
-| Editor app (Windows, Qt 6 Widgets + Direct3D 11) | `Editor/App` | `k_editor`: MainWindow, EditorViewport. Thin binding of widgets to `EditorDocument`. **Never compiled with real Qt yet.** Renderer source shared from `Editor/Spike` |
+| Editor app (Windows, Qt 6 Widgets + Direct3D 11) | `Editor/App` | `k_editor`: MainWindow, EditorViewport. Thin binding of widgets to `EditorDocument`. **Compiled and smoke-tested (`--smoke`, 40 checks) with real Qt 6.12/MSVC on the owner's machine (2026-11-23); interactive behaviour (real mouse use, appearance) not yet observed.** Renderer source shared from `Editor/Spike` |
 | Editing | `Engine/Editing` | `Command`/`CommandHistory` (undo/redo, merge, dirty tracking), UUID-addressed scene commands, `SceneEditor` (document model: edits, save/open, isolated Play). The Editor UI talks only to this. ADR-0011 |
 | CLI | `Tools/CLI` | `k --version`, `k --help`, `k doctor [--json]` (build facts + engine self-checks), `k scene validate|dump <file> [--json]`; `doctor` and `scene` take `--log-file <path>` (JSON Lines run log, append, flushed per line) |
 

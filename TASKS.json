@@ -133,7 +133,7 @@
             "CMakeLists.txt",
             "BUILDING.md"
           ],
-          "notes": "Make route verified (Debug/Release/ASan+UBSan). CMake written but never executed (no cmake). No unverified platform targets included."
+          "notes": "Make route verified (Debug/Release/ASan+UBSan). CMake route executed by the owner on Windows 2026-11-23 (MSBuild 18.11.1, Qt 6.12): all targets build, ctest 6/6. Not verified: CMake on Linux or with any non-MSVC compiler. No unverified platform targets included."
         },
         {
           "id": "M0-T05",
@@ -194,7 +194,7 @@
             "Full cross-platform release matrix"
           ],
           "evidence": "2026-11-23: .github/workflows/ci.yml written (linux-core: make debug/asan+ubsan/release, all STRICT=1; windows-core: cmake + MSVC build + ctest, no Qt; logs uploaded as artifacts). YAML parses (PyYAML). Equivalent local commands run on Linux: all three make configurations exit 0 (unit 152/152, CLI 21, visual 8).",
-          "notes": "NOT yet run on GitHub: no run URL exists, so 'CI configures and builds' and 'failure output retained' are unverified there. Windows job is unverified (default CMake generator on windows-2022 untested). Editor/Qt and the D3D spike are not built in CI. Close this task after the first green run is recorded in BUILDING.md."
+          "notes": "First GitHub run (owner-reported 2026-11-23): windows-core FAILED on MSVC 19.44 (error C3850 in test_json.cpp: lone-surrogate escapes in raw string literals). Fixed in the source (8 literals) and guarded by Tests/Hygiene (make hygiene-test, part of make check). Linux job results not reported. NOT closed: needs a recorded green run of all jobs (record in BUILDING.md); more MSVC 19.44 errors may still be hidden behind the first one."
         }
       ]
     },
@@ -235,7 +235,7 @@
             "Tests/Unit/test_editor_core.cpp",
             "Editor/App/README.md"
           ],
-          "notes": "Qt-free core done and tested (152 unit tests). Qt shell COMPILED CLEANLY with real Qt 6.12/MSVC on the owner machine (2026-11-19) but its behaviour is not observed yet: editor_smoke/editor_screenshot failed to start (DLL not found; PATH) - fixed in CMake (tests now set PATH), awaiting rerun, plus the manual checklist in Editor/App/README.md."
+          "notes": "Qt-free core done and tested. Qt shell COMPILED with real Qt 6.12/MSVC and runs: ctest 6/6 and `k_editor --smoke` 40 checks, 0 failed on the owner's machine (2026-11-23), so launch, docks, menus, Explorer/Inspector sync, Undo/Redo text, Save/Open, Play/Stop, Duplicate and the drop path are checked programmatically. NOT observed: how the window looks and real interactive use (manual checklist in Editor/App/README.md)."
         },
         {
           "id": "M05-T02",
@@ -426,7 +426,7 @@
           "out_of_scope": [
             "Advanced multi-select gizmo behavior"
           ],
-          "notes": "Selection (Explorer and viewport click) and Inspector transform/name editing are implemented in Editor/Core + Editor/App; the core is tested, the UI binding is unverified until the first Qt compile/run. Reparent for Explorer drag-and-drop exists in the core (EditorDocument::reparent/can_reparent, tested); the Qt binding (ExplorerTree) was written 2026-11-23 but has never been compiled or run."
+          "notes": "Selection (Explorer and viewport click) and Inspector transform/name editing are implemented in Editor/Core + Editor/App; the core is tested, the UI binding is unverified until the first Qt compile/run. Reparent for Explorer drag-and-drop exists in the core (EditorDocument::reparent/can_reparent, tested); the Qt binding (ExplorerTree) compiled and its document-level path passes --smoke on Windows (2026-11-23); a real mouse drag is not yet observed."
         },
         {
           "id": "M05-T05",
@@ -499,7 +499,7 @@
             "Tests/Unit/test_composite.cpp",
             "Tests/Unit/test_explorer_drop.cpp"
           ],
-          "notes": "Engine side done and tested (create/delete subtree/transform/rename/reparent, merge, dirty tracking, no dangling handles because commands use UUIDs). Remaining: wiring into the Editor UI (menu/shortcuts, selection by UUID, gesture end on mouse release) - depends on M05-T01/T04. 2026-11-23: reparent gained a sibling index and a KeepWorld mode (Engine/Editing, decompose_trs in Engine/Scene) and EditorDocument::reparent/can_reparent (the Qt-free entry points for Explorer drag-and-drop); 12 new tests, 10/10 injected bugs caught. No Explorer drag-and-drop UI yet. 2026-11-23: composite commands (all-or-nothing, rollback in both directions) and Duplicate (subtree, new UUIDs, one undo step; EditorDocument::duplicate_selected) added and tested, 12/12 injected bugs caught. Paste/clipboard not done. No Duplicate menu item yet. 2026-11-23 (later): resolve_drop / can_drop / reparent_by_drop added and tested (core). Qt: ExplorerTree drag-and-drop and Edit > Duplicate written, NOT compiled or run; no Duplicate toolbar button."
+          "notes": "Engine side done and tested (create/delete subtree/transform/rename/reparent, merge, dirty tracking, no dangling handles because commands use UUIDs). Remaining: wiring into the Editor UI (menu/shortcuts, selection by UUID, gesture end on mouse release) - depends on M05-T01/T04. 2026-11-23: reparent gained a sibling index and a KeepWorld mode (Engine/Editing, decompose_trs in Engine/Scene) and EditorDocument::reparent/can_reparent (the Qt-free entry points for Explorer drag-and-drop); 12 new tests, 10/10 injected bugs caught. No Explorer drag-and-drop UI yet. 2026-11-23: composite commands (all-or-nothing, rollback in both directions) and Duplicate (subtree, new UUIDs, one undo step; EditorDocument::duplicate_selected) added and tested, 12/12 injected bugs caught. Paste/clipboard not done. No Duplicate menu item yet. 2026-11-23 (later): resolve_drop / can_drop / reparent_by_drop added and tested (core). Qt: ExplorerTree drag-and-drop and Edit > Duplicate compiled and smoke-checked on Windows 2026-11-23 (mouse drag not observed); no Duplicate toolbar button."
         },
         {
           "id": "M05-T07",

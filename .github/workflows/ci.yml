@@ -10,7 +10,8 @@
 #                   spike are NOT built in CI (no Qt install, no GPU); they stay a
 #                   manual owner check. No other OS / compiler matrix is claimed.
 #
-# Status: WRITTEN BUT NOT YET RUN on GitHub. Record the first real run in BUILDING.md.
+# Status: first run failed on windows-core (MSVC 19.44 rejected raw-string \u escapes in tests;
+# fixed, see BUILDING.md). No green run recorded yet.
 name: ci
 
 on:

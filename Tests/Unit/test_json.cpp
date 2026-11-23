@@ -76,7 +76,7 @@ KTEST(json_rejects_utf8_bom) {
 }
 
 KTEST(json_string_escapes_and_unicode) {
-    auto r = Json::parse(R"("a\"b\\c\/d\b\f\n\r\t \u00e9 \u20ac \ud83d\ude00")");
+    auto r = Json::parse("\"a\\\"b\\\\c\\/d\\b\\f\\n\\r\\t \\u00e9 \\u20ac \\ud83d\\ude00\"");
     KCHECK(r.ok());
     if (!r.ok()) return;
     // é = C3 A9, € = E2 82 AC, U+1F600 = F0 9F 98 80
@@ -88,11 +88,11 @@ KTEST(json_string_escapes_and_unicode) {
 }
 
 KTEST(json_rejects_invalid_strings) {
-    KCHECK(!parses(R"("\ud83d")"));          // lone high surrogate
-    KCHECK(!parses(R"("\ude00")"));          // lone low surrogate
-    KCHECK(!parses(R"("\ud83d\u0041")"));    // high surrogate + non-low-surrogate
-    KCHECK(!parses(R"("\u12")"));            // truncated escape
-    KCHECK(!parses(R"("\u12zz")"));          // bad hex digit
+    KCHECK(!parses("\"\\ud83d\""));          // lone high surrogate
+    KCHECK(!parses("\"\\ude00\""));          // lone low surrogate
+    KCHECK(!parses("\"\\ud83d\\u0041\""));    // high surrogate + non-low-surrogate
+    KCHECK(!parses("\"\\u12\""));            // truncated escape
+    KCHECK(!parses("\"\\u12zz\""));          // bad hex digit
     KCHECK(!parses("\"\xFF\""));             // invalid UTF-8 byte
     KCHECK(!parses("\"\xC0\x80\""));         // overlong NUL
     KCHECK(!parses("\"\xC3\""));             // truncated sequence

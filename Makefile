@@ -2,8 +2,9 @@
 #
 # This is the build route VERIFIED in the current development environment,
 # which has no CMake/Ninja (see BUILDING.md, DEVELOPMENT_STATUS.md). CMake
-# (CMakeLists.txt) is the intended primary build once it can be run. Both
-# build the same sources by glob, so they cannot drift on file lists.
+# (CMakeLists.txt) is the primary build; it has been run on Windows by the
+# owner (BUILDING.md). Both build the same sources by glob, so they cannot
+# drift on file lists.
 #
 #   make                      build k and k_unit_tests (Debug)
 #   make check                build, then run unit tests + CLI tests
@@ -58,7 +59,7 @@ EDITOR_LIB := $(BUILD_DIR)/libkengine_editor_core.a
 CLI_BIN    := $(BUILD_DIR)/k
 TEST_BIN   := $(BUILD_DIR)/k_unit_tests
 
-.PHONY: all check check-full test test-full cli-test visual-selftest clean help
+.PHONY: all check check-full test test-full cli-test visual-selftest hygiene-test clean help
 all: $(CLI_BIN) $(TEST_BIN)
 
 $(BUILD_DIR)/%.o: %.cpp
@@ -93,9 +94,13 @@ cli-test: $(CLI_BIN)
 visual-selftest:
 	python3 -m unittest discover -s Tests/Visual -p test_png_probe.py -v
 
-check-full: test-full cli-test visual-selftest
+# Source hygiene that GCC cannot check (see the docstring in Tests/Hygiene/test_source_hygiene.py).
+hygiene-test:
+	python3 -m unittest discover -s Tests/Hygiene -v
 
-check: test cli-test visual-selftest
+check-full: test-full cli-test visual-selftest hygiene-test
+
+check: test cli-test visual-selftest hygiene-test
 
 clean:
 	rm -rf Build
