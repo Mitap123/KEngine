@@ -62,6 +62,9 @@ private:
     bool do_save_as();
     void do_create(k::ObjectKind kind);
     void do_delete();
+    void do_duplicate();
+    // Explorer drag-and-drop (called after the drag ended, so the tree may be rebuilt safely).
+    void do_drop(const k::Uuid& dragged, const k::Uuid& target, k::DropPosition position);
     void do_undo();
     void do_redo();
     void do_play();
@@ -98,6 +101,7 @@ private:
     QAction* act_undo_ = nullptr;
     QAction* act_redo_ = nullptr;
     QAction* act_delete_ = nullptr;
+    QAction* act_duplicate_ = nullptr;
     QAction* act_create_[4] = {};       // Empty, Cube, Sphere, Plane
     QAction* act_frame_ = nullptr;
     QAction* act_play_ = nullptr;

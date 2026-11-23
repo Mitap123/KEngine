@@ -7,7 +7,7 @@ Qt 6 Widgets window: menus + toolbar (File / Edit / Create / View / Play), Explo
 Viewport: left-drag orbit, right/middle-drag or Shift+left-drag pan, wheel zoom, click selects (orange), click empty space clears, `F` = Frame All.
 Keys: Ctrl+N/O/S, Ctrl+Shift+S, Ctrl+Z / redo, Delete, F5 = Play, Shift+F5 = Stop.
 Play runs a demo on a **copy** of the scene (cubes and spheres spin); editing is locked; Stop restores the authored scene exactly.
-Limits: Inspector scale cannot go below 0.001; no drag-and-drop reparenting; no multi-select; no grid/gizmos; objects are created at the origin under the root.
+Limits: Inspector scale cannot go below 0.001; Explorer drag-and-drop reparenting and Edit > Duplicate (Ctrl+D) were written on 2026-11-23 but have **never been compiled or run** (see the checklist); no multi-select; no paste; no grid/gizmos; objects are created at the origin under the root.
 
 ## Build (Windows 10/11, same environment that built the spike)
 ```
@@ -31,4 +31,4 @@ Expected tests: `unit`, `cli`, `png_probe`, `viewport_screenshot` (spike), and t
 ## What to send back
 1. ~~Compiler output~~ - done: built clean.
 2. `ctest` result for all tests; for `editor_smoke` the full printed check list if anything fails.
-3. By hand: does the window look sane (docks, menus, viewport)? Create > Cube/Sphere/Plane work? Explorer click and viewport click select and stay in sync? Editing a Position box moves the object? Rename updates the Explorer? Undo/Redo menu text changes? Save/Open round trip? Play spins the shapes and locks editing, Stop restores? Closing with unsaved changes asks?
+3. By hand: does the window look sane (docks, menus, viewport)? Create > Cube/Sphere/Plane work? Explorer click and viewport click select and stay in sync? Editing a Position box moves the object? Rename updates the Explorer? Undo/Redo menu text changes? Save/Open round trip? Play spins the shapes and locks editing, Stop restores? Closing with unsaved changes asks? **New (2026-11-23, never run):** Edit > Duplicate (Ctrl+D) copies the selected object with its children as "Name 2" and selects it, and one Undo removes it. Drag an Explorer row onto the middle of another row (becomes its child), onto the upper/lower edge (becomes its sibling before/after), or onto empty space below all rows (becomes the last root): the object must not visibly jump in the viewport, the move must be one Undo step, a row cannot be dropped onto itself or its own child (the drop indicator should refuse), and nothing can be dropped while Play is running.

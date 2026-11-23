@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "Editor/Core/ExplorerModel.h"
 #include "Engine/Editing/SceneEditor.h"
 
 namespace k {
@@ -87,6 +88,12 @@ public:
     // command.object_not_found, scene.cycle (onto itself or into its own subtree). It does not
     // predict the KeepWorld shear/singular errors; those only show when the move is tried.
     Status can_reparent(const Uuid& id, const Uuid& new_parent) const;
+
+    // Explorer drag-and-drop: resolve_drop() + can_reparent() / reparent() (KeepWorld). `target` is the
+    // row dropped on (ignored for OnEmptySpace). can_drop() is the side-effect-free hover check: Ok means
+    // the drop would be accepted structurally (it does not predict the KeepWorld shear/singular errors).
+    Status can_drop(const Uuid& dragged, const Uuid& target, DropPosition position) const;
+    Status reparent_by_drop(const Uuid& dragged, const Uuid& target, DropPosition position);
 
     Status undo();
     Status redo();

@@ -186,6 +186,21 @@ Status EditorDocument::reparent(const Uuid& id, const Uuid& new_parent, std::siz
     return editor_.reparent(id, new_parent, sibling_index, mode);
 }
 
+Status EditorDocument::can_drop(const Uuid& dragged, const Uuid& target, DropPosition position) const {
+    if (playing())
+        return make_error("editor.read_only_while_playing", "the scene cannot be edited while Play is running; stop first");
+    const auto placement = resolve_drop(editor_.scene(), dragged, target, position);
+    if (!placement) return placement.error();
+    return can_reparent(dragged, placement.value().parent);
+}
+
+Status EditorDocument::reparent_by_drop(const Uuid& dragged, const Uuid& target, DropPosition position) {
+    if (Status st = can_drop(dragged, target, position); !st) return st;
+    const auto placement = resolve_drop(editor_.scene(), dragged, target, position);  // cannot fail: can_drop just resolved it
+    if (!placement) return placement.error();
+    return reparent(dragged, placement.value().parent, placement.value().sibling_index, ReparentMode::KeepWorld);
+}
+
 Status EditorDocument::undo() {
     Status st = editor_.undo();
     sanitize_selection();

@@ -1,11 +1,14 @@
 #include "Editor/App/MainWindow.h"
 
 #include <cstdio>
+#include <functional>
 
 #include <QAction>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDockWidget>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QDoubleSpinBox>
 #include <QElapsedTimer>
 #include <QFileDialog>
@@ -43,6 +46,66 @@ constexpr k::TransformField kFields[3] = {k::TransformField::Position, k::Transf
 const char* const kFieldNames[3] = {"Position", "Rotation (deg)", "Scale"};
 const k::ObjectKind kCreateKinds[4] = {k::ObjectKind::Empty, k::ObjectKind::Cube, k::ObjectKind::Sphere, k::ObjectKind::Plane};
 const char* const kCreateNames[4] = {"Empty", "Cube", "Sphere", "Plane"};
+
+// Explorer tree whose drag-and-drop goes through the document instead of letting Qt move the items:
+// the document is the source of truth and the tree is rebuilt from it after every change. The drop
+// itself is therefore always ended with Qt::IgnoreAction (so the view never removes the source item),
+// and the document call is deferred until the drag has fully finished.
+class ExplorerTree final : public QTreeWidget {
+public:
+    using QTreeWidget::QTreeWidget;
+
+    // Hover check (true = this drop would be accepted) and the drop itself.
+    std::function<bool(const k::Uuid& dragged, const k::Uuid& target, k::DropPosition)> can_drop;
+    std::function<void(const k::Uuid& dragged, const k::Uuid& target, k::DropPosition)> on_drop;
+
+protected:
+    void dragMoveEvent(QDragMoveEvent* e) override {
+        QTreeWidget::dragMoveEvent(e);   // updates the drop indicator and the base accept/ignore decision
+        if (!e->isAccepted()) return;
+        k::Uuid dragged, target;
+        k::DropPosition position = k::DropPosition::OnEmptySpace;
+        if (!resolve(e->position().toPoint(), dragged, target, position) || !can_drop || !can_drop(dragged, target, position))
+            e->ignore();
+    }
+
+    void dropEvent(QDropEvent* e) override {
+        k::Uuid dragged, target;
+        k::DropPosition position = k::DropPosition::OnEmptySpace;
+        const bool ok = resolve(e->position().toPoint(), dragged, target, position);
+        e->setDropAction(Qt::IgnoreAction);
+        e->accept();
+        setState(QAbstractItemView::NoState);   // the base dropEvent would do this; we do not call it
+        viewport()->update();
+        if (ok && on_drop) QTimer::singleShot(0, this, [this, dragged, target, position] { on_drop(dragged, target, position); });
+    }
+
+private:
+    bool resolve(const QPoint& point, k::Uuid& dragged, k::Uuid& target, k::DropPosition& position) const {
+        const QList<QTreeWidgetItem*> selected = selectedItems();
+        if (selected.isEmpty()) return false;
+        const auto d = k::Uuid::parse(selected.first()->data(0, Qt::UserRole).toString().toStdString());
+        if (!d) return false;
+        dragged = *d;
+
+        const DropIndicatorPosition indicator = dropIndicatorPosition();
+        if (indicator == QAbstractItemView::OnViewport) {
+            position = k::DropPosition::OnEmptySpace;
+            return true;
+        }
+        QTreeWidgetItem* over = itemAt(point);
+        if (!over) return false;
+        const auto t = k::Uuid::parse(over->data(0, Qt::UserRole).toString().toStdString());
+        if (!t) return false;
+        target = *t;
+        switch (indicator) {
+            case QAbstractItemView::OnItem: position = k::DropPosition::OnItem; return true;
+            case QAbstractItemView::AboveItem: position = k::DropPosition::AboveItem; return true;
+            case QAbstractItemView::BelowItem: position = k::DropPosition::BelowItem; return true;
+            default: return false;
+        }
+    }
+};
 
 }  // namespace
 
@@ -85,9 +148,19 @@ MainWindow::~MainWindow() { delete play_clock_; }
 // ------------------------------------------------------------------ building ---
 
 void MainWindow::build_docks() {
-    tree_ = new QTreeWidget(this);
+    auto* tree = new ExplorerTree(this);
+    tree_ = tree;
     tree_->setHeaderHidden(true);
     tree_->setSelectionMode(QAbstractItemView::SingleSelection);
+    tree_->setDragDropMode(QAbstractItemView::InternalMove);
+    tree_->setDefaultDropAction(Qt::MoveAction);
+    tree_->setDropIndicatorShown(true);
+    tree->can_drop = [this](const k::Uuid& dragged, const k::Uuid& target, k::DropPosition position) {
+        return static_cast<bool>(doc_->can_drop(dragged, target, position));
+    };
+    tree->on_drop = [this](const k::Uuid& dragged, const k::Uuid& target, k::DropPosition position) {
+        do_drop(dragged, target, position);
+    };
     auto* explorer = new QDockWidget(tr("Explorer"), this);
     explorer->setWidget(tree_);
     addDockWidget(Qt::LeftDockWidgetArea, explorer);
@@ -168,6 +241,7 @@ void MainWindow::build_actions_and_menus() {
     act_undo_ = make_action(tr("Undo"), QKeySequence::Undo, [this] { do_undo(); });
     act_redo_ = make_action(tr("Redo"), QKeySequence::Redo, [this] { do_redo(); });
     act_delete_ = make_action(tr("&Delete"), QKeySequence::Delete, [this] { do_delete(); });
+    act_duplicate_ = make_action(tr("D&uplicate"), QKeySequence(Qt::CTRL | Qt::Key_D), [this] { do_duplicate(); });
 
     for (int i = 0; i < 4; ++i) {
         const k::ObjectKind kind = kCreateKinds[i];
@@ -192,6 +266,7 @@ void MainWindow::build_actions_and_menus() {
     edit->addAction(act_redo_);
     edit->addSeparator();
     edit->addAction(act_delete_);
+    edit->addAction(act_duplicate_);
 
     QMenu* create = menuBar()->addMenu(tr("&Create"));
     for (int i = 0; i < 4; ++i) create->addAction(act_create_[i]);
@@ -284,6 +359,7 @@ void MainWindow::refresh_actions() {
     act_redo_->setText(q(doc_->redo_label()));
     act_redo_->setEnabled(doc_->can_redo());
     act_delete_->setEnabled(!playing && !doc_->selected().is_nil());
+    act_duplicate_->setEnabled(!playing && !doc_->selected().is_nil());
     for (int i = 0; i < 4; ++i) act_create_[i]->setEnabled(!playing);
     act_play_->setEnabled(!playing);
     act_stop_->setEnabled(playing);
@@ -390,6 +466,27 @@ void MainWindow::do_delete() {
     report(st, tr("Delete"));
     if (st) log(tr("Deleted %1.").arg(name));
     refresh_all();
+}
+
+void MainWindow::do_duplicate() {
+    const k::SceneObject* o = doc_->selected_object();
+    const QString name = o ? q(o->name) : QString();
+    auto copy = doc_->duplicate_selected();
+    if (!copy) {
+        report(k::Status(copy.error()), tr("Duplicate"));
+        return;
+    }
+    log(tr("Duplicated %1.").arg(name));
+    refresh_all();
+}
+
+void MainWindow::do_drop(const k::Uuid& dragged, const k::Uuid& target, k::DropPosition position) {
+    const k::SceneObject* o = doc_->scene().get(doc_->scene().find_by_uuid(dragged));
+    const QString name = o ? q(o->name) : QString();
+    const k::Status st = doc_->reparent_by_drop(dragged, target, position);
+    report(st, tr("Move"));
+    if (st) log(tr("Moved %1.").arg(name));
+    refresh_all();   // also resets the tree if the move was refused or changed nothing
 }
 
 void MainWindow::do_undo() {
@@ -564,6 +661,33 @@ int MainWindow::run_smoke_test(const QString& temp_dir) {
     do_frame_all();
     QApplication::processEvents();
     check(viewport_->init_error().empty(), tr("viewport still healthy after the workflow"));
+
+    // Duplicate and Explorer drag-and-drop, through the same calls the widgets make. Placed last: they
+    // restore the scene, and nothing above depends on the undo history or the dirty flag.
+    {
+        const std::string before_text = authored_text();
+        const std::vector<k::ExplorerRow> rows = k::build_explorer_rows(doc_->scene());
+        check(rows.size() == 3, tr("three objects before the Duplicate/Drop checks"));
+        if (rows.size() == 3) {
+            select_in_explorer(rows[0].id);
+            act_duplicate_->trigger();
+            check(explorer_count() == 4 && !doc_->selected().is_nil() && doc_->selected() != rows[0].id, tr("Duplicate adds a copy and selects it"));
+            do_undo();
+            check(explorer_count() == 3 && authored_text() == before_text, tr("Undo removes the duplicate exactly"));
+
+            do_drop(rows[0].id, rows[1].id, k::DropPosition::OnItem);
+            const auto a = items_.find(rows[0].id);
+            const auto b = items_.find(rows[1].id);
+            check(a != items_.end() && b != items_.end() && a->second->parent() == b->second, tr("dropping on a row makes the object its child in the Explorer"));
+            check(explorer_count() == 3 && doc_->undo_label().find("Reparent") != std::string::npos, tr("the drop is one Reparent undo step"));
+            do_undo();
+            const auto a2 = items_.find(rows[0].id);
+            check(a2 != items_.end() && a2->second->parent() == nullptr && authored_text() == before_text, tr("Undo puts the object back exactly"));
+
+            do_drop(rows[0].id, rows[0].id, k::DropPosition::OnItem);   // onto itself: refused, nothing changes
+            check(authored_text() == before_text && explorer_count() == 3, tr("dropping an object onto itself changes nothing"));
+        }
+    }
 
     std::printf("SMOKE: %d checks, %d failed\n", checks, failures);
     std::fflush(stdout);
