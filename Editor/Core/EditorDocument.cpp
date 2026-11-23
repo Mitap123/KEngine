@@ -127,6 +127,21 @@ Status EditorDocument::delete_selected() {
     return st;
 }
 
+Result<Uuid> EditorDocument::duplicate_selected() {
+    if (selected_.is_nil()) return make_error("document.no_selection", "nothing is selected");
+    const SceneObject* o = selected_object();
+    if (!o) return make_error("command.object_not_found", "the selected object is not in the scene");
+    // "Cube 2" -> base "Cube" so copies count up instead of becoming "Cube 2 2".
+    std::string base = o->name;
+    const std::size_t space = base.find_last_of(' ');
+    if (space != std::string::npos && space > 0 && space + 1 < base.size() &&
+        base.find_first_not_of("0123456789", space + 1) == std::string::npos)
+        base.resize(space);
+    auto copy = editor_.duplicate(selected_, unique_name(base));
+    if (copy) selected_ = copy.value();
+    return copy;
+}
+
 Status EditorDocument::rename_selected(std::string name) {
     if (selected_.is_nil()) return make_error("document.no_selection", "nothing is selected");
     return editor_.rename(selected_, std::move(name));

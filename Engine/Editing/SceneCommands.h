@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "Engine/Editing/Command.h"
 
@@ -45,5 +46,14 @@ enum class ReparentMode {
 std::unique_ptr<Command> make_reparent_command(const Uuid& id, const Uuid& new_parent,
                                                std::size_t sibling_index = Scene::kAppend,
                                                ReparentMode mode = ReparentMode::KeepLocal);
+
+// Several commands as ONE undo step, e.g. Duplicate. apply() runs the steps in order; if step i
+// fails, steps i-1..0 are reverted and the original error is returned (the scene is unchanged).
+// revert() reverts in reverse order; if a step cannot be reverted (the scene was changed behind
+// the history's back) the steps already reverted are applied again so the scene is unchanged.
+// If even that rollback fails, command.rollback_failed is returned. An empty list fails with
+// command.empty_composite. Never merges. Steps keep their own contracts (apply() may be called
+// again after revert(), reproducing the same result).
+std::unique_ptr<Command> make_composite_command(std::string name, std::vector<std::unique_ptr<Command>> steps);
 
 }  // namespace k

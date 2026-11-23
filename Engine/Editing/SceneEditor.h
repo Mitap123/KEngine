@@ -59,6 +59,12 @@ public:
     Status reparent(const Uuid& id, const Uuid& new_parent, std::size_t sibling_index = Scene::kAppend,
                     ReparentMode mode = ReparentMode::KeepLocal);
 
+    // Copies `id` and its whole subtree (new UUIDs; names, kinds and transforms kept) as ONE undo
+    // step. The copy of `id` is named `new_name` and sits right after the original among its
+    // siblings; it is returned. Redo recreates the same UUIDs. Errors: command.object_not_found,
+    // editor.read_only_while_playing; on any failure nothing changes.
+    Result<Uuid> duplicate(const Uuid& id, std::string new_name);
+
     // Call when a drag/gesture ends so the next edit starts a new undo step.
     void end_edit_gesture() { history_.break_merge(); }
 

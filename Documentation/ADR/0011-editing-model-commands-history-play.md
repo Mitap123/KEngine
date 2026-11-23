@@ -17,6 +17,8 @@ The Editor needs undo/redo for create/delete/transform/rename/reparent, a reliab
 
 - **Reparent semantics (added 2026-11-23):** `make_reparent_command(id, parent, sibling_index, mode)`. The index is counted after the object is removed from its old spot (same parent = reorder). `KeepLocal` leaves the transform numbers alone (the object may jump); `KeepWorld` recomputes the local transform as `inverse(new_parent_world) * old_world`, split by `decompose_trs` (T*R*S, Euler `Ry*Rx*Rz`, a reflection on the X scale). Because a local transform is position + Euler + per-axis scale, KeepWorld cannot always be expressed: a rotated object under a non-uniformly scaled parent needs shear. That is **rejected** with `command.world_transform_not_representable` (never approximated), and a zero-scale parent with `command.singular_parent_transform`; the scene is unchanged and no history entry is made. `EditorDocument::reparent` defaults to KeepWorld (what drag-and-drop should do), `SceneEditor::reparent` defaults to KeepLocal (unchanged engine behaviour). A KeepWorld move that leaves the world matrix unchanged keeps the exact transform bytes; a move to the place the object already is records no undo step.
 
+- **Composite commands and Duplicate (added 2026-11-23):** `make_composite_command(name, steps)` is one undo step made of several commands. It is all-or-nothing in both directions: if step i fails on apply, steps i-1..0 are reverted and the original error is returned; if a step cannot be reverted on undo (scene changed behind the history), the steps already reverted are applied again. If that rollback itself fails the error is `command.rollback_failed`; an empty list is `command.empty_composite`. `SceneEditor::duplicate(id, name)` builds a composite of create / set-transform steps for the whole subtree with fresh UUIDs picked up front (so redo recreates the same objects), plus one reparent step that places the copy right after the original. `EditorDocument::duplicate_selected` names the copy with the next free number ("Cube" -> "Cube 2"; a trailing number is replaced, so "Cube 2" -> "Cube 3") and selects it.
+
 ## Options considered
 Handle-based commands (rejected: dangling after delete). Storing full-scene snapshots per step (rejected: memory grows with scene size). Allowing edits during Play with automatic revert (rejected for M0.5: ambiguous semantics, easy to lose work). Serialize-reload for the Play copy (rejected: adds a failure mode and cost for no extra isolation).
 
@@ -25,7 +27,7 @@ Handle-based commands (rejected: dangling after delete). Storing full-scene snap
 
 ## Trade-offs / limitations
 - Handles are numerically identical in the source and the Play copy (ADR-0003): never carry a handle between them; use UUIDs.
-- No composite commands yet (duplicate, paste). Undo of `reparent` assumes LIFO history.
+- Composite commands exist (below) but there is no clipboard/paste yet. Undo of `reparent` assumes LIFO history.
 - KeepWorld decomposition normalises Euler angles (X in [-90, 90]; Z = 0 at the poles): the moved object is equivalent, but its Inspector numbers can differ from what a user typed. Undo restores the original numbers exactly.
 - Property edits are limited to name and transform until the reflection layer exists (ADR-0002).
 - Memory of the Play copy is proportional to scene size.

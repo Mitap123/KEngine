@@ -69,6 +69,11 @@ public:
     Status set_selected_transform(const Transform& transform, bool merge = false);
     void end_edit_gesture() { editor_.end_edit_gesture(); }
 
+    // Copies the selected object and its subtree as one undo step; the copy is named like the
+    // original with the next free number ("Cube" -> "Cube 2", "Cube 2" -> "Cube 3"), sits right
+    // after it and becomes the selection. Error document.no_selection if nothing is selected.
+    Result<Uuid> duplicate_selected();
+
     // Moves `id` under `new_parent` (nil = root) at `sibling_index` among the new siblings,
     // counted after the object is removed from its old spot (Scene::kAppend = last; the same
     // parent reorders). This is what an Explorer drag-and-drop calls. One undo step; the

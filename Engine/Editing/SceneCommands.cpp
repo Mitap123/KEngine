@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "Engine/Scene/SceneTransforms.h"
@@ -310,6 +311,51 @@ private:
     std::string label_ = "object";
 };
 
+// --------------------------------------------------------------- composite ---
+
+class CompositeCommand final : public Command {
+public:
+    CompositeCommand(std::string name, std::vector<std::unique_ptr<Command>> steps)
+        : name_(std::move(name)), steps_(std::move(steps)) {}
+
+    std::string name() const override { return name_; }
+
+    Status apply(Scene& scene) override {
+        if (steps_.empty()) return make_error("command.empty_composite", "a composite command needs at least one step");
+        for (std::size_t i = 0; i < steps_.size(); ++i) {
+            Status st = steps_[i]->apply(scene);
+            if (st) continue;
+            // Undo what already went in, newest first, so a failure changes nothing.
+            for (std::size_t j = i; j-- > 0;) {
+                if (Status back = steps_[j]->revert(scene); !back)
+                    return make_error("command.rollback_failed", "could not undo step " + std::to_string(j) +
+                                                                     " after a failed step: " + back.error().message);
+            }
+            return st;
+        }
+        return Status::success();
+    }
+
+    Status revert(Scene& scene) override {
+        for (std::size_t i = steps_.size(); i-- > 0;) {
+            Status st = steps_[i]->revert(scene);
+            if (st) continue;
+            // Put back what was already reverted (steps i+1..n-1), oldest first.
+            for (std::size_t j = i + 1; j < steps_.size(); ++j) {
+                if (Status fwd = steps_[j]->apply(scene); !fwd)
+                    return make_error("command.rollback_failed", "could not re-apply step " + std::to_string(j) +
+                                                                     " after a failed undo: " + fwd.error().message);
+            }
+            return st;
+        }
+        return Status::success();
+    }
+
+private:
+    std::string name_;
+    std::vector<std::unique_ptr<Command>> steps_;
+};
+
 }  // namespace
 
 std::unique_ptr<Command> make_create_command(const Uuid& id, ObjectKind kind, std::string name, const Uuid& parent) {
@@ -325,6 +371,10 @@ std::unique_ptr<Command> make_rename_command(const Uuid& id, std::string new_nam
 std::unique_ptr<Command> make_reparent_command(const Uuid& id, const Uuid& new_parent, std::size_t sibling_index,
                                                ReparentMode mode) {
     return std::make_unique<ReparentCommand>(id, new_parent, sibling_index, mode);
+}
+
+std::unique_ptr<Command> make_composite_command(std::string name, std::vector<std::unique_ptr<Command>> steps) {
+    return std::make_unique<CompositeCommand>(std::move(name), std::move(steps));
 }
 
 }  // namespace k
